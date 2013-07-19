@@ -1,0 +1,54 @@
+__jsimport( "utility/Logger.js" ) ;
+__jsimport( "utility/ConsoleLogger.js" ) ;
+__jsimport( "utility/FileLogger.js" ) ;
+
+var __displayview ;
+var __logview ;
+var __lognum ;
+var __the_number_of_registers = 8 ;
+var __num_format = 16 ;
+var __num_digit = 4 ;
+var __the_number_of_APRs = 8 ;
+var __memory_capacity = 1024 * 18 * 8 ;
+var __logger = new BlobLogger( Logger.NONE_LEVEL ) ;
+//var __logger = new FileLogger( "C:\pdp11.log" ) ;
+
+/*
+var bin_data ;
+var terminal ;
+var terminal_line ;
+var resultview ;
+var textview ;
+var inodeview ;
+var superblockview ;
+var binaryview ;
+var runview ;
+var argview ;
+var traceview ;
+var editview ;
+var savebutton ;
+var reloadbutton ;
+var runbutton ;
+var superblock ;
+var loaded ;
+var edit_inode ;
+var current_i_number ;
+var current_name ;
+var current_dir_i_number ;
+var pdp11 ;
+var trace ;
+var stdin = String( ) ;
+var stdout ;
+var u_name ;
+var u_dir ;
+var u_index ;
+var ps_stack = new Array( ) ;
+var pc_stack = new Array( ) ;
+var sp_stack = new Array( ) ;
+var r5_stack = new Array( ) ;
+var ret_stack = new Array( ) ;
+var proc_stack = new Array( ) ;
+var proc_queue = new Array( ) ;
+var regs_queue = new Array( ) ;
+var ps_queue = new Array( ) ;
+*/

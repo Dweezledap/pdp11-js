@@ -1,0 +1,127 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>file</title>
+<script type="text/javascript" src="utility/JsImport.js"></script>
+<script type="text/javascript" src="pdp11/Import.js"></script>
+
+<script type="text/javascript" src="pdp11/object.js"></script>
+<script type="text/javascript" src="pdp11/BinData.js"></script>
+<script type="text/javascript" src="pdp11/Inode.js"></script>
+<script type="text/javascript" src="pdp11/File.js"></script>
+<script type="text/javascript" src="pdp11/Exe.js"></script>
+<script type="text/javascript" src="pdp11/ExeHeader.js"></script>
+
+<script type="text/javascript">
+
+var terminal ;
+var pdp11 ;
+var __loglevel ;
+
+window.addEventListener( 'dragover', function( event ) {
+  event.preventDefault( ) ;
+}, false ) ;
+
+window.addEventListener( 'drop', function( event ) {
+
+  event.preventDefault( ) ;
+  var file = event.dataTransfer.files[ 0 ] ;
+
+  var reader = new FileReader( ) ;
+  reader.onload = function( event ) {
+    // 0xc6 : inode number of /rkunix  temporary work.
+    // TODO : make the boot loader.
+    var bin_data = object( BinData ).create( event.target.result ) ;
+    var inode = object( Inode ).create( 0xc6, bin_data ) ;
+    var file = object( File ).create( inode ) ;
+    var exe = object( Exe ).create( file ) ;
+
+    pdp11 = new Pdp11( ) ;
+    terminal = pdp11.terminal ;
+    pdp11.memory.storeBuffer( exe.buffer( ) ) ;
+    pdp11.disk.storeBuffer( event.target.result ) ;
+    pdp11.setSymbols( exe.symbols( ) ) ;
+    pdp11.run( ) ;
+  } ;
+  reader.onerror = function( e ) {
+    __displayview.innerHTML += 'Error!<br />' ;
+    __displayview.innerHTML += '<br />' ;
+    for( var key in reader.error ) {
+      __displayview.innerHTML += key + '=' + reader.error[ key ] + '<br />' ;
+    }
+  };
+  reader.readAsArrayBuffer( file ) ;
+
+}, false ) ;
+
+
+function init( ) {
+  __displayview = document.getElementById( "displayview" ) ;
+  __logview = document.getElementById( "logview" ) ;
+  __lognum = document.getElementById( "lognum" ) ;
+  __loglevel = document.getElementById( "loglevel" ) ;
+}
+
+stop_pdp11 = function( ) {
+  pdp11.stop = true ;
+} ;
+
+lognum_change = function( ) {
+  __logview.setAttribute( "rows", parseInt( __lognum.selectedOptions.item( ).value ) + 1 ) ;
+} ;
+
+loglevel_change = function( ) {
+  __logger.setLevel( parseInt( __loglevel.selectedOptions.item( ).value ) ) ;
+} ;
+
+document.onkeydown = function( e ) {
+  var keyCode = e.keyCode ;
+  if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
+    keyCode += 0x20 ;
+  }
+  if( terminal )
+    terminal.input( keyCode ) ;
+  e.preventDefault( ) ;
+} ;
+
+</script>
+</head>
+<body onLoad="init( )">
+<p>
+<textarea id="displayview" cols="80" rows="20"></textarea>
+</p>
+
+<p>
+<button onclick="stop_pdp11( )">stop</button>
+</p>
+
+<p>
+<select id="loglevel" onchange="loglevel_change( )">
+<option value="1">DEBUG</option>
+<option value="2">LOG</option>
+<option value="3">WARN</option>
+<option value="4">ERROR</option>
+<option value="5" selected>NONE</option>
+</select>
+</p>
+
+<p>
+<select id="lognum" onchange="lognum_change( )">
+<option value="1">1</option>
+<option value="10">10</option>
+<option value="20" selected>20</option>
+<option value="40">40</option>
+<option value="80">80</option>
+<option value="160">160</option>
+<option value="320">320</option>
+<option value="640">640</option>
+<option value="1280">1280</option>
+</select>
+</p>
+
+<p>
+<textarea id="logview" cols="80" rows="20"></textarea>
+</p>
+
+</body>
+</html>
