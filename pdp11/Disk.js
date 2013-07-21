@@ -11,7 +11,7 @@ function Disk( pdp11 ) {
   this.pdp11 = pdp11 ;
   this.rkds = new Register( ) ;
   this.rker = new Register( ) ;
-  this.rkcs = new Register( ) ;
+  this.rkcs = new RegisterWithCallBack( this.check.bind( this ) ) ;
   this.rkwc = new Register( ) ;
   this.rkba = new Register( ) ;
   this.rkda = new Register( ) ;
@@ -23,11 +23,12 @@ function Disk( pdp11 ) {
   this.uint16 = new Uint16Array( buffer ) ;
   this.int16  = new Int16Array( buffer ) ;
 
-  this.run( ) ;
+  this.step = 0 ;
+  this.busy = false ;
 }
 
 Disk._CAPACITY = 512 * 4800 * 8 ; // 512bytes x 4800records x 8drives
-Disk._INTERVAL = 10000 ;
+Disk._INTERVAL = 100 ;
 Disk._INTERRUPT_LEVEL = 5 ;
 Disk._INTERRUPT_VECTOR = 0220 ;
 
@@ -48,25 +49,37 @@ Disk._RKCS_COMMAND_BIT  = 1 ;
 Disk._RKCS_COMMAND_MASK = 0x7 ;
 
 Disk.prototype.run = function( ) {
-  var self = this ;  var func = function( ) { // TODO: not implemented yet.
-    if( self._go( ) ) {
-      switch( self._getCommand( ) ) {
+
+  if( ! this.busy )
+    return ;
+
+  this.step++ ;
+  if( this.step >= Disk._INTERVAL ) {
+    if( this._go( ) ) {
+      switch( this._getCommand( ) ) {
         case Disk._COMMAND_READ:
-          self._runLoad( ) ;
+          this._runLoad( ) ;
           break ;
         case Disk._COMMAND_WRITE:
-          self._runStore( ) ;
+          this._runStore( ) ;
           break ;
         default:
           throw new Error( "not implemented yet." ) ;
           break ;
       }
-      self.rkcs.writeWord( 0x80 ) ; // TODO: error check?
-      self.pdp11.interrupt( Disk._INTERRUPT_LEVEL, Disk._INTERRUPT_VECTOR ) ;
+      this.busy = false ;
+      this.rkcs.writeWord( 0x80 ) ; // TODO: error check?
+      this.pdp11.interrupt( Disk._INTERRUPT_LEVEL, Disk._INTERRUPT_VECTOR ) ;
     }
-    setTimeout( func, Disk._INTERVAL ) ;
-  } ;
-  func( ) ;
+    this.step = 0 ;
+  }
+} ;
+
+Disk.prototype.check = function( ) {
+  if( this._go( ) ) {
+    this.step = 0 ;
+    this.busy = true ;
+  }
 } ;
 
 Disk.prototype._getCommand = function( ) {
@@ -95,11 +108,13 @@ Disk.prototype._getWordCount = function( ) {
 } ;
 
 Disk.prototype._runLoad = function( ) {
-  __logger.log( this._dump( ) ) ;
+//  __logger.log( this._dump( ) ) ;
   for( var i = 0; i < this._getWordCount( ); i++ ) {
+/*
     __logger.log( "disk:" + format( this._calculateDiskAddress( ) + i * 2 ) +
                   " -> " + format( this._loadWord( this._calculateDiskAddress( ) + i * 2 ) ) + " -> " +
                   "memory:" + format( this._calculateMemoryAddress( ) + i * 2 ) ) ;
+*/
     this.pdp11.mmu.storeWordByPhysicalAddress(
       this._calculateMemoryAddress( ) + i * 2,
       this._loadWord( this._calculateDiskAddress( ) + i * 2 ) ) ;
@@ -107,11 +122,13 @@ Disk.prototype._runLoad = function( ) {
 } ;
 
 Disk.prototype._runStore = function( ) {
-  __logger.log( this._dump( ) ) ;
+//  __logger.log( this._dump( ) ) ;
   for( var i = 0; i < this._getWordCount( ); i++ ) {
+/*
     __logger.log( "disk:" + format( this._calculateDiskAddress( ) + i * 2 ) +
                   " <- " + format( this.pdp11.mmu.loadWordByPhysicalAddress( this._calculateMemoryAddress( ) + i * 2 ) ) + " <- " +
                   "memory:" + format( this._calculateMemoryAddress( ) + i * 2 ) ) ;
+*/
     this._storeWord(
       this._calculateDiskAddress( ) + i * 2,
       this.pdp11.mmu.loadWordByPhysicalAddress( this._calculateMemoryAddress( ) + i * 2 ) ) ;

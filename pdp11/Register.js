@@ -8,12 +8,13 @@
  * This prototype provides Register emulation.
  * @author Takahiro <hogehoge@gachapin.jp>
  */
-function Register( ) {
+function Register( callback ) {
     var buffer = new ArrayBuffer( Register._wordSize ) ;
     this.uint8 = new Uint8Array( buffer ) ;
     this.uint16 = new Uint16Array( buffer ) ;
     this.int16 = new Int16Array( buffer ) ;
     this.uint16[ 0 ] = 0 ;
+    this.callback = callback ;
 }
 
 Register._wordSize = 2 ; // 2bytes
@@ -95,7 +96,9 @@ Register.prototype.writeHighByte = function( value ) {
  * TODO: change 0xffff to word size unspecific one.
  */
 Register.prototype.writePartial = function( value, offset, mask ) {
-  this.writeWord( ( this.readWord( ) & ( 0xffff & ~( mask << offset ) ) ) | ( value << offset ) ) ;
+  this.writeWord( ( this.readWord( )
+                  & ( 0xffff & ~( mask << offset ) ) )
+                  | ( value << offset ) ) ;
 } ;
 
 Register.prototype.writeBit = function( bit, value ) {
@@ -145,4 +148,42 @@ Register.prototype.decrementByte = function( ) {
   this.uint16[ 0 ] -= 1 ;
   return this.readWord( ) ;
 } ;
+
+
+
+__jsimport( "utility/Inherit.js" ) ;
+
+function RegisterWithCallBack( callback ) {
+  Register.call( this ) ;
+  this.callback = callback ;
+}
+
+RegisterWithCallBack.prototype = __inherit( Register.prototype ) ;
+RegisterWithCallBack.prototype.constructor = RegisterWithCallBack ;
+
+RegisterWithCallBack.prototype.writeWord = function( value ) {
+  Register.prototype.writeWord.call( this, value ) ;
+  this.callback( ) ;
+} ;
+
+RegisterWithCallBack.prototype.writeLowByte = function( value ) {
+  Register.prototype.writeLowByte.call( this, value ) ;
+  this.callback( ) ;
+} ;
+
+RegisterWithCallBack.prototype.writeHighByte = function( value ) {
+  Register.prototype.writeHighByte.call( this, value ) ;
+  this.callback( ) ;
+} ;
+
+RegisterWithCallBack.prototype.writePartial = function( value, offset, mask ) {
+  Register.prototype.writePartial.call( this, value ) ;
+  this.callback( ) ;
+} ;
+
+RegisterWithCallBack.prototype.writeBit = function( bit, value ) {
+  Register.prototype.writeBit.call( this, value ) ;
+  this.callback( ) ;
+} ;
+
 

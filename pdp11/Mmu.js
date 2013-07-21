@@ -20,6 +20,9 @@ function Mmu( ) {
   this.ssr2 = new Register( ) ;
 }
 
+//Mmu._TRAP_POINT = 0x450 << 6 ; // temporal
+Mmu._TRAP_POINT = 0x472 << 6 ; // temporal
+
 Mmu.prototype.setPsw = function( psw ) {
   this.psw = psw ;
 } ;
@@ -175,7 +178,7 @@ Mmu.prototype.loadWordFromPreviousUserSpace = function( v_address, value ) {
   this.psw.setCurrentMode( this.psw.getPreviousMode( ) ) ;
   var p_address = this._convert( v_address ) ;
   this.psw.setCurrentMode( tmp ) ;
-  if( p_address == ( 0x450 << 6 ) )  // temporal
+  if( p_address == Mmu._TRAP_POINT )  // temporal
     throw new RangeError( '' ) ;
   if( p_address >= 0760000 )
     return this._map( p_address ).readWord(  ) ;
@@ -220,9 +223,6 @@ Mmu.prototype.loadWordByPhysicalAddress = function( p_address ) {
 } ;
 
 Mmu.prototype.storeWordByPhysicalAddress = function( p_address, value ) {
-  if( p_address == 0xaa76 ) {
-    __logger.log( "value:" + format( value ) ) ;
-  }
   if( p_address >= 0760000 )
     this._map( p_address ).writeWord( value ) ;
   else
