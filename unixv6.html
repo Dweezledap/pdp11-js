@@ -74,13 +74,15 @@ loglevel_change = function( ) {
   __logger.setLevel( parseInt( __loglevel.selectedOptions.item( ).value ) ) ;
 } ;
 
-document.onkeydown = function( e ) {
+document.onkeypress = function( e ) {
   var keyCode = e.keyCode ;
+
   if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
     keyCode += 0x20 ;
   }
   if( terminal )
     terminal.input( keyCode ) ;
+//  console.log( format( keyCode ) + ':' + String.fromCharCode( keyCode & 0x7f ) ) ;
   e.preventDefault( ) ;
 } ;
 

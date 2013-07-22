@@ -38,6 +38,13 @@ function get_inode( i_number ) {
   return object( Inode ).create( i_number, bin_data ) ;
 }
 
+function to_int32( uint32 ) {
+  var buffer = new ArrayBuffer( 4 ) ;
+  var int32 = new Int32Array( buffer ) ;
+  int32[ 0 ] = uint32 ;
+  return int32[ 0 ] ;
+}
+
 function to_int16( uint16 ) {
   var buffer = new ArrayBuffer( 2 ) ;
   var int16 = new Int16Array( buffer ) ;

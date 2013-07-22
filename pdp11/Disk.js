@@ -100,7 +100,8 @@ Disk.prototype._calculateDiskAddress = function( ) {
 } ;
 
 Disk.prototype._calculateMemoryAddress = function( ) {
-  return this.rkba.readWord( ) ;
+  // temporal
+  return ( this.rkcs.readPartial( 4, 0x3 ) << 16 ) | this.rkba.readWord( ) ;
 } ;
 
 Disk.prototype._getWordCount = function( ) {
@@ -108,13 +109,11 @@ Disk.prototype._getWordCount = function( ) {
 } ;
 
 Disk.prototype._runLoad = function( ) {
-//  __logger.log( this._dump( ) ) ;
+  __logger.log( this._dump( ) ) ;
   for( var i = 0; i < this._getWordCount( ); i++ ) {
-/*
     __logger.log( "disk:" + format( this._calculateDiskAddress( ) + i * 2 ) +
                   " -> " + format( this._loadWord( this._calculateDiskAddress( ) + i * 2 ) ) + " -> " +
                   "memory:" + format( this._calculateMemoryAddress( ) + i * 2 ) ) ;
-*/
     this.pdp11.mmu.storeWordByPhysicalAddress(
       this._calculateMemoryAddress( ) + i * 2,
       this._loadWord( this._calculateDiskAddress( ) + i * 2 ) ) ;
@@ -122,13 +121,11 @@ Disk.prototype._runLoad = function( ) {
 } ;
 
 Disk.prototype._runStore = function( ) {
-//  __logger.log( this._dump( ) ) ;
+  __logger.log( this._dump( ) ) ;
   for( var i = 0; i < this._getWordCount( ); i++ ) {
-/*
     __logger.log( "disk:" + format( this._calculateDiskAddress( ) + i * 2 ) +
                   " <- " + format( this.pdp11.mmu.loadWordByPhysicalAddress( this._calculateMemoryAddress( ) + i * 2 ) ) + " <- " +
                   "memory:" + format( this._calculateMemoryAddress( ) + i * 2 ) ) ;
-*/
     this._storeWord(
       this._calculateDiskAddress( ) + i * 2,
       this.pdp11.mmu.loadWordByPhysicalAddress( this._calculateMemoryAddress( ) + i * 2 ) ) ;

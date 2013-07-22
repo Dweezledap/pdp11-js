@@ -19,7 +19,7 @@ function Terminal( pdp11 ) {
   this.busy = false ;
 }
 
-Terminal._INTERVAL = 4000 ;
+Terminal._INTERVAL = 400 ;
 
 Terminal._RSR_BUSY_BIT = 11 ;
 Terminal._RSR_DONE_BIT = 7 ;
