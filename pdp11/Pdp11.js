@@ -747,9 +747,9 @@ var DoubleOperandInstructions = {
       pdp11._loadAndStore( code & 0000077, Pdp11._WIDTH_WORD, src,
         function( arg1, arg2, pdp11 ) {
           var result = arg1 + arg2 ;
-          pdp11.psw.setN( to_int16( result ) < 0 ? true : false ) ;
-          pdp11.psw.setZ( to_int16( result ) == 0 ? true : false ) ;
-          pdp11.psw.setV( ( ( ~( arg1 ^ arg2 ) & ( arg2 ^ result ) ) >> 15 ) & 1 ) ;
+          pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
+          pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD ) ) ;
+          pdp11.psw.setV( ( ( ( ~arg1 ^ arg2 ) & ( arg2 ^ result ) ) >> 15 ) & 1 ) ;
           pdp11.psw.setC( result > 0xffff ) ;
           return result ;
         } ) ;
@@ -761,11 +761,11 @@ var DoubleOperandInstructions = {
       var src = pdp11._load( ( code & 0007700 ) >> 6, Pdp11._WIDTH_WORD ) ;
       pdp11._loadAndStore( code & 0000077, Pdp11._WIDTH_WORD, src,
         function( arg1, arg2, pdp11 ) {
-          var result = arg1 - arg2 ;
-          pdp11.psw.setN( to_int16( result ) < 0  ? true : false ) ;
-          pdp11.psw.setZ( to_int16( result ) == 0 ? true : false ) ;
+          var result = arg1 + ( ~arg2 & 0xffff ) + 1 ;
+          pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
+          pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD ) ) ;
           pdp11.psw.setV( ( ( ( arg1 ^ arg2 ) & ( ~arg2 ^ result ) ) >> 15 ) & 1 ) ;
-          pdp11.psw.setC( arg1 < arg2 ) ;
+          pdp11.psw.setC( ( result & 0x10000 ) == 0 ? true : false ) ;
           return result ;
         } ) ;
   } }
@@ -1288,24 +1288,14 @@ var OpHandler = {
   cmp: function( pdp11, code, width ) {
     var src = pdp11._load( ( code & 0007700 ) >> 6, width ) ;
     var dst = pdp11._load( code & 0000077, width ) ;
-    // temporal
-    if( width == Pdp11._WIDTH_WORD ) {
-      src = to_int16( src ) ;
-      dst = to_int16( dst ) ;
-    } else {
-      src = to_int8( src ) ;
-      dst = to_int8( dst ) ;
-    }
-    var result = src - dst ;
+    var shift = width == Pdp11._WIDTH_WORD ? 15 : 7 ;
+    var mask  = width == Pdp11._WIDTH_WORD ?  0xffff :  0xff ;
+    var carry = width == Pdp11._WIDTH_WORD ? 0x10000 : 0x100 ;
+    var result = src + ( ~dst & mask ) + 1 ;
     pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
     pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
-    // copy & paste from toyoshim
-    if( width == Pdp11._WIDTH_WORD )
-      pdp11.psw.setV( ( ( ( src ^ dst ) & ( ~dst ^ result ) ) >> 15 ) & 1 ) ;
-    else
-      pdp11.psw.setV( ( ( ( src ^ dst ) & ( ~dst ^ result ) ) >> 7 ) & 1 ) ;
-
-    pdp11.psw.setC( src < dst ) ;
+    pdp11.psw.setV( ( ( ( src ^ dst ) & ( ~dst ^ result ) ) >> shift ) & 1 ) ;
+    pdp11.psw.setC( ( result & carry ) == 0 ? true : false ) ;
   },
 
   bit: function( pdp11, code, width ) {
