@@ -20,8 +20,7 @@ function Mmu( ) {
   this.ssr2 = new Register( ) ;
 }
 
-//Mmu._TRAP_POINT = 0x450 << 6 ; // temporal
-Mmu._TRAP_POINT = 0x472 << 6 ; // temporal
+Mmu._TRAP_POINT = 0xf00 << 6 ; // temporal
 
 Mmu.prototype.setPsw = function( psw ) {
   this.psw = psw ;
@@ -128,32 +127,22 @@ Mmu.prototype._map = function( address ) {
 
 Mmu.prototype.loadWord = function( v_address ) {
   var p_address = this._convert( v_address ) ;
-  if( p_address >= 0760000 )
-    return this._map( p_address ).readWord( ) ;
-  return this.memory.loadWord( p_address ) ;
+  return this.loadWordByPhysicalAddress( p_address ) ;
 } ;
 
 Mmu.prototype.loadByte = function( v_address ) {
   var p_address = this._convert( v_address ) ;
-  if( p_address >= 0760000 )
-    return this._map( p_address ).readLowByte( ) ;
-  return this.memory.loadByte( p_address ) ;
+  return this.loadByteByPhysicalAddress( p_address ) ;
 } ;
 
 Mmu.prototype.storeWord = function( v_address, value ) {
   var p_address = this._convert( v_address ) ;
-  if( p_address >= 0760000 )
-    this._map( p_address ).writeWord( value ) ;
-  else
-    this.memory.storeWord( p_address, value ) ;
+  this.storeWordByPhysicalAddress( p_address, value ) ;
 } ;
 
 Mmu.prototype.storeByte = function( v_address, value ) {
   var p_address = this._convert( v_address ) ;
-  if( p_address >= 0760000 )
-    this._map( p_address ).writeLowByte( value ) ;
-  else
-    this.memory.storeByte( p_address, value ) ;
+  this.storeByteByPhysicalAddress( p_address, value ) ;
 } ;
 
 /**
@@ -164,26 +153,20 @@ Mmu.prototype.storeWordIntoPreviousUserSpace = function( v_address, value ) {
   this.psw.setCurrentMode( this.psw.getPreviousMode( ) ) ;
   var p_address = this._convert( v_address ) ;
   this.psw.setCurrentMode( tmp ) ;
-  if( p_address >= 0760000 )
-    this._map( p_address ).writeWord( value ) ;
-  else
-    this.memory.storeWord( p_address, value ) ;
+  this.storeWordByPhysicalAddress( p_address, value ) ;
 } ;
 
 /**
  * TODO: implement
  */
-Mmu.prototype.loadWordFromPreviousUserSpace = function( v_address, value ) {
+Mmu.prototype.loadWordFromPreviousUserSpace = function( v_address ) {
   var tmp = this.psw.getCurrentMode( ) ;
   this.psw.setCurrentMode( this.psw.getPreviousMode( ) ) ;
   var p_address = this._convert( v_address ) ;
   this.psw.setCurrentMode( tmp ) ;
   if( p_address == Mmu._TRAP_POINT )  // temporal
     throw new RangeError( '' ) ;
-  if( p_address >= 0760000 )
-    return this._map( p_address ).readWord(  ) ;
-  else
-    return this.memory.loadWord( p_address ) ;
+  return this.loadWordByPhysicalAddress( p_address ) ;
 } ;
 
 Mmu.prototype._managementIsAvailable = function( ) {
@@ -222,9 +205,22 @@ Mmu.prototype.loadWordByPhysicalAddress = function( p_address ) {
   return this.memory.loadWord( p_address ) ;
 } ;
 
+Mmu.prototype.loadByteByPhysicalAddress = function( p_address ) {
+  if( p_address >= 0760000 )
+    return this._map( p_address ).readLowByte( ) ;
+  return this.memory.loadByte( p_address ) ;
+} ;
+
 Mmu.prototype.storeWordByPhysicalAddress = function( p_address, value ) {
   if( p_address >= 0760000 )
     this._map( p_address ).writeWord( value ) ;
   else
     this.memory.storeWord( p_address, value ) ;
+} ;
+
+Mmu.prototype.storeByteByPhysicalAddress = function( p_address, value ) {
+  if( p_address >= 0760000 )
+    this._map( p_address ).writeLowByte( value ) ;
+  else
+    this.memory.storeByte( p_address, value ) ;
 } ;

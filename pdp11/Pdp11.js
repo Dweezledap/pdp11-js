@@ -284,6 +284,10 @@ Pdp11.prototype.run = function( ) {
   var symbolName = null ;
   var runStep = function( ) {
   for( var count = 0; count < Pdp11._LOOP; count++ ) {
+    if( self.stop ) {
+      self._dumpLog( ) ;
+      break ;
+    }
     try {
 
       if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
@@ -294,7 +298,7 @@ Pdp11.prototype.run = function( ) {
       self.disk.run( ) ;
 
       if( self.psw.getTrap( ) ) {
-//        __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
+        __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
 //        console.log( "trap occured. " + format( self.trap_vector ) ) ;
         self.psw.setTrap( false ) ;
         var tmp_psw = self.psw.readWord( ) ;
@@ -310,9 +314,9 @@ Pdp11.prototype.run = function( ) {
         self.psw.setPreviousMode( tmp_mode ) ;
 
         self.trap_vector = 0 ;
-//        __logger.log( self.dump( ) ) ;
+        __logger.log( self.dump( ) ) ;
       } else if( self.interrupt_vector && self.interrupt_level > self.psw.getPriority( ) ) {
-//        __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
+        __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
 //        console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
         var tmp_psw = self.psw.readWord( ) ;
         var tmp_pc = self._getPc( ).readWord( ) ;
@@ -330,7 +334,7 @@ Pdp11.prototype.run = function( ) {
         self.interrupt_vector = 0 ;
         self.interrupt_level = 0 ;
         self.wait = false ;
-//        __logger.log( self.dump( ) ) ;
+        __logger.log( self.dump( ) ) ;
       }
 
       if( self.wait ) {
@@ -365,22 +369,16 @@ Pdp11.prototype.run = function( ) {
           symbolName = symbol ;
           self._addHistory( symbolName ) ;
         }
-        if( op && op.op == 'trap' ) {
-          var buffer = 'trap ' + SystemCall[ code & 0xff ].name ;
-          if( ( code & 0xff ) == 0 ) {
-            var tmp = self.mmu.loadWord( self._getPc( ).readWord( ) ) ;
-            var sys_op = self.mmu.loadWord( tmp ) ;
-            buffer += '(' + SystemCall[ sys_op & 0xff ].name + ')' ;
-          }
-          console.log( buffer ) ;
-        }
       }
-/*
-      if( ! self.stop )
-        setTimeout( runStep, Pdp11._INTERVAL ) ;
-      else
-        self._dumpLog( ) ;
-*/
+      if( op && op.op == 'trap' ) {
+        var buffer = 'trap ' + SystemCall[ code & 0xff ].name ;
+        if( ( code & 0xff ) == 0 ) {
+          var tmp = self.mmu.loadWord( self._getPc( ).readWord( ) ) ;
+          var sys_op = self.mmu.loadWord( tmp ) ;
+          buffer += '(' + SystemCall[ sys_op & 0xff ].name + ')' ;
+        }
+        console.log( buffer ) ;
+      }
     } catch( e ) {
       console.log( format( code ) + ':' + op.op ) ;
       console.log( e.stack ) ;
@@ -389,7 +387,8 @@ Pdp11.prototype.run = function( ) {
       throw e ;
     }
   }
-  setTimeout( runStep, 0 ) ;
+  if( ! self.stop )
+    setTimeout( runStep, 0 ) ;
   } ;
   runStep( ) ;
 } ;
@@ -435,7 +434,7 @@ Pdp11.prototype._calculateOperandAddress = function( num, width ) {
         // throw Exception
       }
       var value = reg.readWord( ) ;
-      if( width == Pdp11._WIDTH_BYTE )
+      if( width == Pdp11._WIDTH_BYTE && reg_num < 6 ) // correct?
         reg.incrementByte( ) ;
       else
         reg.incrementWord( ) ;
@@ -453,7 +452,7 @@ Pdp11.prototype._calculateOperandAddress = function( num, width ) {
 
     // General and PC : Register decrements, then contains address.
     case 4:
-      if( width == Pdp11._WIDTH_BYTE )
+      if( width == Pdp11._WIDTH_BYTE && reg_num < 6 ) // correct?
         reg.decrementByte( ) ;
       else
         reg.decrementWord( ) ;
@@ -746,12 +745,12 @@ var DoubleOperandInstructions = {
     run : function( pdp11, code ) {
       var src = pdp11._load( ( code & 0007700 ) >> 6, Pdp11._WIDTH_WORD ) ;
       pdp11._loadAndStore( code & 0000077, Pdp11._WIDTH_WORD, src,
-        function( arg1, arg2, pdp11 ) { 
+        function( arg1, arg2, pdp11 ) {
           var result = arg1 + arg2 ;
-          pdp11.psw.setN( result < 0 ? true : false ) ;
-          pdp11.psw.setZ( result == 0 ? true : false ) ;
-          pdp11.psw.setV( result > 0xffff || result < -0x10000 ? true : false ) ;
-          pdp11.psw.setC( false ) ;
+          pdp11.psw.setN( to_int16( result ) < 0 ? true : false ) ;
+          pdp11.psw.setZ( to_int16( result ) == 0 ? true : false ) ;
+          pdp11.psw.setV( ( ( ~( arg1 ^ arg2 ) & ( arg2 ^ result ) ) >> 15 ) & 1 ) ;
+          pdp11.psw.setC( result > 0xffff ) ;
           return result ;
         } ) ;
   } },
@@ -763,114 +762,123 @@ var DoubleOperandInstructions = {
       pdp11._loadAndStore( code & 0000077, Pdp11._WIDTH_WORD, src,
         function( arg1, arg2, pdp11 ) {
           var result = arg1 - arg2 ;
-          pdp11.psw.setN( result < 0  ? true : false ) ;
-          pdp11.psw.setZ( result == 0 ? true : false ) ;
-          pdp11.psw.setV( result > 0xffff || result < -0x10000 ? true : false ) ;
-          if( arg1 >= 0 && arg2 < 0 ) {
-            pdp11.psw.setC( arg2 > 0xffff ? false : true ) ;
-          } else if( ( arg2 >= 0 && arg1 >= 0 ) || ( arg2 < 0 & arg1 < 0 ) ) {
-            pdp11.psw.setC( arg2 >= 0 ? false : true ) ;
-          } else {
-            pdp11.psw.setC( false ) ;
-          }
+          pdp11.psw.setN( to_int16( result ) < 0  ? true : false ) ;
+          pdp11.psw.setZ( to_int16( result ) == 0 ? true : false ) ;
+          pdp11.psw.setV( ( ( ( arg1 ^ arg2 ) & ( ~arg2 ^ result ) ) >> 15 ) & 1 ) ;
+          pdp11.psw.setC( arg1 < arg2 ) ;
           return result ;
         } ) ;
   } }
 } ;
 
 var OneHalfOperandInstructions = {
+  // TODO: confirm
   'mul' :
   { judge : 0177000, value : 0070000, op : 'mul',   type : OpType.I_ONEHALF,
     run : function( pdp11, code ) {
       var reg = ( code & 0000700 ) >> 6 ;
       var src = pdp11._load( code & 0000077, Pdp11._WIDTH_WORD ) ;
-      var num = pdp11._getReg( reg ).readWord( ) * src ;
+      var result = pdp11._getReg( reg ).readWord( ) * src ;
 
       if( reg & 1 == 0 ) {
-        pdp11._getReg( reg + 0 ).writeWord( ( num & 0xffff0000 ) >> 8 ) ;
-        pdp11._getReg( reg + 1 ).writeWord( num & 0xffff ) ;
+        pdp11._getReg( reg + 0 ).writeWord( ( result & 0xffff0000 ) >> 8 ) ;
+        pdp11._getReg( reg + 1 ).writeWord( result & 0xffff ) ;
       } else {
-        pdp11._getReg( reg + 0 ).writeWord( num & 0xffff ) ;
+        pdp11._getReg( reg + 0 ).writeWord( result & 0xffff ) ;
       }
-      pdp11.psw.setN( pdp11._isNegative( num, Pdp11._WIDTH_WORD ) ) ;
-      pdp11.psw.setV( pdp11._isZero( num, Pdp11._WIDTH_WORD ) ) ;
-      pdp11.psw.setC( num > 0xffffffff | num < -0x100000000 ? true : false ) ;
+      pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
+      pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD ) ) ;
+      pdp11.psw.setV( false ) ;
+      pdp11.psw.setC( result > 0xffffffff || result < -0x100000000 ? true : false ) ;
   } },
+  // TODO: confirm
   'div' :
   { judge : 0177000, value : 0071000, op : 'div',   type : OpType.I_ONEHALF,
     run : function( pdp11, code ) {
       var reg = ( code & 0000700 ) >> 6 ;
-      var addr = pdp11._load( reg, Pdp11._WIDTH_WORD ) ;
       var src = pdp11._load( code & 0000077, Pdp11._WIDTH_WORD ) ;
-      var num = ( ( pdp11._getReg( reg + 0 ).readWord( ) & 0xffff ) << 16 )
-                  | ( pdp11._getReg( reg + 1 ).readWord( ) & 0xffff ) ;
-
-      pdp11._getReg( reg ).writeWord( parseInt( num / src ) & 0xffff ) ;
-      pdp11._getReg( reg + 1 ).writeWord( ( num % src ) & 0xffff ) ;
-      pdp11.psw.setC( ! src ? true : false ) ;
-      pdp11.psw.setV( ! src ? true : false ) ;
+      var value = ( ( pdp11._getReg( reg + 0 ).readWord( ) ) << 16 )
+                     | ( pdp11._getReg( reg + 1 ).readWord( ) ) & 0xffffffff ;
+      var quotient = parseInt( value / src ) & 0xffff ;
+      var remainder = ( value % src ) & 0xffff ;
+      pdp11._getReg( reg + 0 ).writeWord( quotient ) ;
+      pdp11._getReg( reg + 1 ).writeWord( remainder ) ;
+      pdp11.psw.setN( pdp11._isNegative( quotient, Pdp11._WIDTH_WORD ) ) ;
+      pdp11.psw.setZ( pdp11._isZero( quotient, Pdp11._WIDTH_WORD ) ) ;
+      pdp11.psw.setV( src == 0 || value > src ) ; // confirm
+      pdp11.psw.setC( src == 0 ) ; // confirm
   } },
+  // TODO: confirm
   'ash' :
   { judge : 0177000, value : 0072000, op : 'ash',   type : OpType.I_ONEHALF,
     run : function( pdp11, code ) {
       var reg_num = ( code & 0000700 ) >> 6 ;
       var reg = pdp11._getReg( reg_num ) ;
-      var src = to_int16( pdp11._load( code & 0000077, Pdp11._WIDTH_WORD ) ) ;
+      var src = pdp11._load( code & 0000077, Pdp11._WIDTH_WORD ) ;
+      var sign = ( src >> 5 ) & 1 ;
+      src = src & 0x1f ;
 
-      if( src > 0 )
-        reg.writeWord( reg.readWord( ) << src ) ;
-      else
-        reg.writeWord( reg.readWord( ) >> ( src * -1 ) ) ;
-
-      pdp11.psw.setN( pdp11._isNegative( reg.readWord( ) ) ) ;
-      pdp11.psw.setZ( reg.readWord( ) == 0 ? true : false ) ;
-      pdp11.psw.setV( false ) ;
-      pdp11.psw.setC( false ) ;
+      if( sign ) {
+        src = to_int16( src | 0xffe0 ) * -1 ;
+        result = to_int16( reg.readWord( ) ) >> src ;
+        pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD) ) ;
+        pdp11.psw.setV( ( result ^ reg.readWord( ) ) & 0x8000 ) ;
+        pdp11.psw.setC( ( to_int16( reg.readWord( ) ) >> ( src - 1 ) ) & 1 ) ;
+        reg.writeWord( result ) ;
+      } else {
+        result = reg.readWord( ) << src ;
+        pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD) ) ;
+        pdp11.psw.setV( ( result ^ reg.readWord( ) ) & 0x8000 ) ;
+        pdp11.psw.setC( result & 0x10000 ) ;
+        reg.writeWord( result ) ;
+      }
   } },
+  // TODO: confirm
   'ashc' :
   { judge : 0177000, value : 0073000, op : 'ashc',  type : OpType.I_ONEHALF,
     run : function( pdp11, code ) {
-      var reg = ( code & 0000700 ) >> 6 ;
-      var addr = pdp11._calculateOperandAddress( ( code & 0000700 ) >> 6, Pdp11._WIDTH_WORD ) ;
+      var reg_num = ( code & 0000700 ) >> 6 ;
+      var reg = pdp11._getReg( reg_num ) ;
       var src = pdp11._load( code & 0000077, Pdp11._WIDTH_WORD ) ;
-      var val = ( pdp11._getReg( reg ).readWord( ) << 16 ) |
-                ( pdp11._getReg( reg + 1 ).readWord( ) & 0xffff ) ;
-      var c ;
+      var sign = ( src >> 5 ) & 1 ;
+      src = src & 0x1f ;
+      var value = ( ( pdp11._getReg( reg_num + 0 ).readWord( ) << 16 ) |
+                    pdp11._getReg( reg_num + 1 ).readWord( ) ) & 0xffffffff ;
 
-      if( src & 040 ) {
-        src = ~( src - 1 ) * - 1 ;
-      }
-
-      src = to_int16( src ) ;
-
-      if( src == 0 ) {
-        c = false ;
-      } else if( src > 0 ) {
-        c = val & 0x80000000 ? true : false ;
-        val <<= src ;
+      if( sign ) {
+        src = to_int16( src | 0xffe0 ) * -1 ;
+        result = to_int32( value ) >> src ;
+        pdp11.psw.setN( result & 0x80000000 ) ;
+        pdp11.psw.setZ( ( result & 0xffffffff ) == 0 ) ;
+        pdp11.psw.setV( ( result ^ value ) & 0x80000000 ) ;
+        pdp11.psw.setC( ( to_int32( value ) >> ( src - 1 ) ) & 1 ) ;
+        pdp11._getReg( reg_num + 0 ).writeWord( ( result & 0xffff0000 ) >> 16 ) ;
+        pdp11._getReg( reg_num + 1 ).writeWord( result & 0xffff ) ;
       } else {
-        c = val & 0x1 ? true : false ;
-        val >>= ( src * -1 ) ;
+        result = value << src ;
+        pdp11.psw.setN( result & 0x80000000 ) ;
+        pdp11.psw.setZ( ( result & 0xffffffff ) == 0 ) ;
+        pdp11.psw.setV( ( result ^ value ) & 0x80000000 ) ;
+        pdp11.psw.setC( result & 0x100000000 ) ;
+        pdp11._getReg( reg_num + 0 ).writeWord( ( result & 0xffff0000 ) >> 16 ) ;
+        pdp11._getReg( reg_num + 1 ).writeWord( result & 0xffff ) ;
       }
-      pdp11._getReg( reg ).writeWord( ( val & 0xffff0000 ) >> 16 ) ;
-      pdp11._getReg( reg + 1 ).writeWord( val & 0xffff ) ;
-
-      pdp11.psw.setN( pdp11._isNegative( pdp11._getReg( reg ).readWord( ), Pdp11._WIDTH_WORD ) ) ;
-      pdp11.psw.setZ( pdp11._isZero( pdp11._getReg( reg ).readWord( ), Pdp11._WIDTH_WORD ) ) ;
-      if( val == 0 ) {
-        pdp11.psw.setZ( true ) ;
-      } else {
-        pdp11.psw.setZ( false ) ;
-      }
-      pdp11.psw.setC( c ) ;
   } },
+  // TODO: confirm
   'xor' :
   { judge : 0177000, value : 0074000, op : 'xor',   type : OpType.I_ONEHALF,
-    run : function( pdp11, proc, code, ahead ) {
-      var reg = Processor.getAddr( ( code & 0000700 ) >> 6, pdp11, proc, ahead, Processor.WORD ) ;
-      var addr = Processor.getAddr( code & 0000077, pdp11, proc, ahead, Processor.WORD ) ;
-      proc.set_word( addr, pdp11.regs[ reg ].get( ) ^ proc.get_word( addr ) ) ;
-      pdp11.setFlag( proc.get_word( addr ) ) ;
+    run : function( pdp11, code ) {
+      var src = pdp11._getReg( ( code & 0000700 ) >> 6 ).readWord( ) ;
+      pdp11._loadAndStore( code & 0000077, Pdp11._WIDTH_WORD, src,
+        function( arg1, arg2, pdp11 ) {
+          var result = arg1 ^ arg2 ;
+          pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
+          pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD ) ) ;
+          pdp11.psw.setV( false ) ;
+          return result ;
+        } ) ;
   } },
   'xxx' :
   { judge : 0177000, value : 0075000, op : 'xxx',   type : OpType.I_ONEHALF },
@@ -881,17 +889,14 @@ var OneHalfOperandInstructions = {
   { judge : 0177000, value : 0077000, op : 'sob',   type : OpType.I_ONEHALF,
     run : function( pdp11, code ) {
       var reg_num = ( code & 0000700 ) >> 6 ;
-      var addr = pdp11._load( reg_num, Pdp11._WIDTH_WORD ) ;
+//      var addr = pdp11._load( reg_num, Pdp11._WIDTH_WORD ) ;
       var reg = pdp11._getReg( reg_num ) ;
       var pc  = pdp11._getPc( ) ;
-      var dst = code & 0000077 ;
-      reg.writeWord( reg.readWord( ) - 1 ) ;
+      var des = code & 0000077 ;
+      reg.decrementByte( ) ;
       if( reg.readWord( ) ) {
-        pc.writeWord( pc.readWord( ) - ( dst * 2 ) ) ;
+        pc.writeWord( pc.readWord( ) - ( des * 2 ) ) ;
       }
-      pdp11.psw.setN( pdp11._isNegative( reg.readWord( ) ) ) ;
-      pdp11.psw.setZ( reg.readWord( ) == 0 ? true : false ) ;
-      pdp11.psw.setV( false ) ;
   } }
 } ;
 
@@ -900,22 +905,25 @@ var SingleOperandInstructions = {
   { judge : 0177700, value : 0000300, op : 'swab',  type : OpType.I_SINGLE,
     run : function( pdp11, code ) {
       var des = code & 077 ;
-      var val ;
       if( ! ( des & 070 ) ) {
-        val = pdp11._getReg( des & 07 ).readWord( ) ;
-        val = ( ( val & 0xff ) << 8 ) | ( ( val & 0xff00 ) >> 8 ) ;
-        pdp11._getReg( des & 07 ).writeWord( val ) ;
+        var src = pdp11._getReg( des & 07 ).readWord( ) ;
+        result = ( ( src & 0xff ) << 8 ) | ( ( src & 0xff00 ) >> 8 ) ;
+        pdp11._getReg( des & 07 ).writeWord( result ) ;
+        pdp11.psw.setN( ( result & 0x80 ) ) ; // correct?
+        pdp11.psw.setZ( ( result & 0xff ) == 0 ) ; // correct?
+        pdp11.psw.setV( false ) ;
+        pdp11.psw.setC( false ) ;
       } else {
-        var addr = pdp11._calculateOperandAddress( des, Pdp11._WIDTH_WORD ) ;
-        val = pdp11.mmu.loadWord( addr ) ;
-        val = ( ( val & 0xff ) << 8 ) | ( ( val & 0xff00 ) >> 8 ) ;
-        pdp11.mmu.storeWord( addr, val ) ;
+        pdp11._loadAndStore( code & 0000077, width, 0,
+          function( arg1, arg2, pdp11 ) {
+            var result = ( ( arg1 & 0xff ) << 8 ) | ( ( arg2 & 0xff00 ) >> 8 ) ;
+            pdp11.psw.setN( ( result & 0x80 ) ) ; // correct?
+            pdp11.psw.setZ( ( result & 0xff ) == 0 ) ; // correct?
+            pdp11.psw.setV( false ) ;
+            pdp11.psw.setC( false ) ;
+            return result ;
+          } ) ;
       }
-      pdp11.psw.setN( val & 0x0100 ? true : false ) ;
-      pdp11.psw.setZ( val ? false : true ) ;
-      pdp11.psw.setV( false ) ;
-      pdp11.psw.setC( false ) ;
-
   } },
 //   'bpl' :
 //  { judge : 0177700, value : 0100300, op : 'bpl',   type : OpType.I_SINGLE },
@@ -931,13 +939,13 @@ var SingleOperandInstructions = {
   } },
   'com' :
   { judge : 0177700, value : 0005100, op : 'com',   type : OpType.I_SINGLE,
-    run : function( pdp11, proc, code, ahead ) {
-      OpHandler.com( pdp11, proc, code, ahead, Processor.WORD ) ;
+    run : function( pdp11, code ) {
+      OpHandler.com( pdp11, code, Pdp11._WIDTH_WORD ) ;
   } },
   'comb' :
   { judge : 0177700, value : 0105100, op : 'comb',  type : OpType.I_SINGLE,
-    run : function( pdp11, proc, code, ahead ) {
-      OpHandler.com( pdp11, proc, code, ahead, Processor.BYTE ) ;
+    run : function( pdp11, code ) {
+      OpHandler.com( pdp11, code, Pdp11._WIDTH_BYTE ) ;
   } },
   'inc' :
   { judge : 0177700, value : 0005200, op : 'inc',   type : OpType.I_SINGLE,
@@ -976,8 +984,8 @@ var SingleOperandInstructions = {
   } },
   'adcb' :
   { judge : 0177700, value : 0105500, op : 'adcb',  type : OpType.I_SINGLE,
-    run : function( pdp11, proc, code, ahead ) {
-      OpHandler.adc( pdp11, proc, code, ahead, Processor.BYTE ) ;
+    run : function( pdp11, code ) {
+      OpHandler.adc( pdp11, code, Pdp11._WIDTH_BYTE ) ;
   } },
   'sbc' :
   { judge : 0177700, value : 0005600, op : 'sbc',   type : OpType.I_SINGLE,
@@ -1008,8 +1016,8 @@ var SingleOperandInstructions = {
   { judge : 0177700, value : 0106000, op : 'rorb',  type : OpType.I_SINGLE },
   'rol' :
   { judge : 0177700, value : 0006100, op : 'rol',   type : OpType.I_SINGLE,
-    run : function( pdp11, proc, code, ahead ) {
-      OpHandler.rol( pdp11, proc, code, ahead, Processor.WORD ) ;
+    run : function( pdp11, code ) {
+      OpHandler.rol( pdp11, code, Pdp11._WIDTH_WORD ) ;
   } },
   'rolb' :
   { judge : 0177700, value : 0106100, op : 'rolb',  type : OpType.I_SINGLE },
@@ -1019,7 +1027,10 @@ var SingleOperandInstructions = {
       OpHandler.asr( pdp11, code, Pdp11._WIDTH_WORD ) ;
   } },
   'asrb' :
-  { judge : 0177700, value : 0106200, op : 'asrb',  type : OpType.I_SINGLE },
+  { judge : 0177700, value : 0106200, op : 'asrb',  type : OpType.I_SINGLE,
+    run : function( pdp11, code ) {
+      OpHandler.asr( pdp11, code, Pdp11._WIDTH_BYTE ) ;
+  } },
   'asl' :
   { judge : 0177700, value : 0006300, op : 'asl',   type : OpType.I_SINGLE,
     run : function( pdp11, code ) {
@@ -1086,9 +1097,10 @@ var SingleOperandInstructions = {
   'sxt' :
   { judge : 0177700, value : 0006700, op : 'sxt',   type : OpType.I_SINGLE,
     run : function( pdp11, code ) {
-      var val = pdp11.psw.getN( ) ? 0xffff : 0x0000 ;
-      pdp11._store( code & 0000077, Pdp11._WIDTH_WORD, val ) ;
-      pdp11.psw.setZ( val ? false : true ) ;
+      var result = pdp11.psw.getN( ) ? 0xffff : 0x0000 ;
+      pdp11._store( code & 0000077, Pdp11._WIDTH_WORD, result ) ;
+      pdp11.psw.setZ( ! pdp11.psw.getN( ) ) ;
+      pdp11.psw.setV( false ) ;
   } },
   'mfps' :
   { judge : 0177700, value : 0106700, op : 'mfps',  type : OpType.I_SINGLE }
@@ -1138,9 +1150,9 @@ var BranchInstructions = {
   } },
   'bpl' :
   { judge : 0177400, value : 0100000, op : 'bpl',   type : OpType.I_BRANCH,
-    run : function( pdp11, proc, code, ahead ) {
-      if( ! pdp11.ps.n )
-        OpHandler.br( pdp11, proc, code, ahead, Processor.WORD ) ;
+    run : function( pdp11, code ) {
+      if( ! pdp11.psw.getN( ) )
+        OpHandler.br( pdp11, code ) ;
   } },
   'bmi' :
   { judge : 0177400, value : 0100400, op : 'bmi',   type : OpType.I_BRANCH,
@@ -1151,7 +1163,7 @@ var BranchInstructions = {
   'bhi' :
   { judge : 0177400, value : 0101000, op : 'bhi',   type : OpType.I_BRANCH,
     run : function( pdp11, code ) {
-      if( ! ( pdp11.psw.getC( ) || pdp11.psw.getZ( ) ) )
+      if( ! pdp11.psw.getC( ) && ! pdp11.psw.getZ( ) )
         OpHandler.br( pdp11, code ) ;
   } },
   'blos' :
@@ -1161,12 +1173,16 @@ var BranchInstructions = {
         OpHandler.br( pdp11, code ) ;
   } },
   'bvc' :
-  { judge : 0177400, value : 0102000, op : 'bvc',   type : OpType.I_BRANCH },
+  { judge : 0177400, value : 0102000, op : 'bvc',   type : OpType.I_BRANCH,
+    run : function( pdp11, code ) {
+      if( ! pdp11.psw.getV( ) )
+        OpHandler.br( pdp11, code ) ;
+  } },
   'bvs' :
   { judge : 0177400, value : 0102400, op : 'bvs',   type : OpType.I_BRANCH,
-    run : function( pdp11, proc, code, ahead ) {
-      if( pdp11.ps.v )
-        OpHandler.br( pdp11, proc, code, ahead, Processor.WORD ) ;
+    run : function( pdp11, code ) {
+      if( pdp11.psw.getV( ) )
+        OpHandler.br( pdp11, code ) ;
   } },
   'bcc' :
   { judge : 0177400, value : 0103000, op : 'bcc',   type : OpType.I_BRANCH,
@@ -1190,8 +1206,8 @@ var OpCode = [
   { judge : 0177777, value : 0000261, op : 'sec',   type : OpType.I_CONDITION },
   { judge : 0177777, value : 0000242, op : 'clv',   type : OpType.I_CONDITION },
   { judge : 0177777, value : 0000262, op : 'sev',   type : OpType.I_CONDITION,
-    run : function( pdp11, proc, code, ahead ) {
-      pdp11.ps.v = true ;
+    run : function( pdp11, code ) {
+      pdp11.psw.setV( true ) ;
   } },
   { judge : 0177777, value : 0000244, op : 'clz',   type : OpType.I_CONDITION },
   { judge : 0177777, value : 0000264, op : 'sez',   type : OpType.I_CONDITION },
@@ -1255,11 +1271,10 @@ var OpCode = [
 var OpHandler = {
 
   mov: function( pdp11, code, width ) {
-    var src = pdp11._load( ( code & 0007700 ) >> 6, width ) ;
-    var result = src ;
+    var result = pdp11._load( ( code & 0007700 ) >> 6, width ) ;
 
     // temporal
-    if( width == Pdp11._WIDTH_BYTE && ( src & 0x80 ) ) {
+    if( width == Pdp11._WIDTH_BYTE && ( result & 0x80 ) ) {
       result |= 0xff00 ;
     }
 
@@ -1269,9 +1284,11 @@ var OpHandler = {
     pdp11.psw.setV( false ) ;
   },
 
+  // confirm
   cmp: function( pdp11, code, width ) {
     var src = pdp11._load( ( code & 0007700 ) >> 6, width ) ;
     var dst = pdp11._load( code & 0000077, width ) ;
+    // temporal
     if( width == Pdp11._WIDTH_WORD ) {
       src = to_int16( src ) ;
       dst = to_int16( dst ) ;
@@ -1280,8 +1297,7 @@ var OpHandler = {
       dst = to_int8( dst ) ;
     }
     var result = src - dst ;
-//    pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-    pdp11.psw.setN( result < 0 ) ;
+    pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
     pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
     // copy & paste from toyoshim
     if( width == Pdp11._WIDTH_WORD )
@@ -1297,7 +1313,7 @@ var OpHandler = {
     var dst = pdp11._load( code & 0000077, width ) ;
     var result = src & dst ;
     pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-    pdp11.psw.setZ( result == 0 ? true : false ) ;
+    pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
     pdp11.psw.setV( false ) ;
   },
 
@@ -1306,8 +1322,8 @@ var OpHandler = {
     pdp11._loadAndStore( code & 0000077, width, src,
       function( arg1, arg2, pdp11 ) {
         var result = arg1 & ~arg2 ;
-        pdp11.psw.setN( pdp11._isNegative( result, width ) ? true : false ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
+        pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
         pdp11.psw.setV( false ) ;
         return result ;
       } ) ;
@@ -1318,8 +1334,8 @@ var OpHandler = {
     pdp11._loadAndStore( code & 0000077, width, src,
       function( arg1, arg2, pdp11 ) {
         var result = arg1 | arg2 ;
-        pdp11.psw.setN( pdp11._isNegative( result ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
+        pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
         pdp11.psw.setV( false ) ;
         return result ;
       } ) ;
@@ -1333,11 +1349,16 @@ var OpHandler = {
     pdp11.psw.setC( false ) ;
   },
 
-  com: function( pdp11, proc, code, ahead, width ) {
-    var val = Processor.setRel( code & 0000077, pdp11, proc, ahead, width, 0,
-      function( arg1, arg2 ) { return ~arg1 ; } ) ;
-    pdp11.setFlag( val ) ;
-    pdp11.ps.c = true ;
+  com: function( pdp11, code, width ) {
+    pdp11._loadAndStore( code & 0000077, width, 0,
+      function( arg1, arg2, pdp11 ) {
+        var result = ~arg1 ;
+        pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        pdp11.psw.setV( false ) ;
+        pdp11.psw.setC( true ) ;
+        return result ;
+      } ) ;
   },
 
   inc: function( pdp11, code, width ) {
@@ -1345,8 +1366,11 @@ var OpHandler = {
       function( arg1, arg2, pdp11 ) {
         var result = arg1 + arg2 ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
-        pdp11.psw.setV( false ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        if( width == Pdp11._WIDTH_WORD )
+          pdp11.psw.setV( arg1 == 0x7fff ) ;
+        else
+          pdp11.psw.setV( arg1 == 0x7f ) ;
         return result ;
       } ) ;
   },
@@ -1356,8 +1380,11 @@ var OpHandler = {
       function( arg1, arg2, pdp11 ) {
         var result = arg1 - arg2 ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
-        pdp11.psw.setV( false ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        if( width == Pdp11._WIDTH_WORD )
+          pdp11.psw.setV( arg1 == 0x8000 ) ;
+        else
+          pdp11.psw.setV( arg1 == 0x80 ) ;
         return result ;
       } ) ;
   },
@@ -1367,8 +1394,12 @@ var OpHandler = {
       function( arg1, arg2, pdp11 ) {
         var result = arg1 * arg2 ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
-        pdp11.psw.setV( false ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        if( width == Pdp11._WIDTH_WORD )
+          pdp11.psw.setV( ( result & 0xffff ) == 0x8000 ) ;
+        else
+          pdp11.psw.setV( ( result & 0xff ) == 0x80 ) ;
+        pdp11.psw.setC( ! pdp11._isZero( result, width ) ) ;
         return result ;
       } ) ;
   },
@@ -1380,8 +1411,13 @@ var OpHandler = {
         var result = arg1 + arg2 ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
         pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
-        pdp11.psw.setV( result == 077777 && arg2 == 1 ) ;
-        pdp11.psw.setC( result == 0177777 && arg2 == 1 ) ;
+        if( width == Pdp11._WIDTH_WORD ) {
+          pdp11.psw.setV( arg1 == 0x7fff && arg2 == 1 ) ;
+          pdp11.psw.setC( arg1 == 0xffff && arg2 == 1 ) ;
+        } else {
+          pdp11.psw.setV( arg1 == 0x7f && arg2 == 1 ) ;
+          pdp11.psw.setC( arg1 == 0xff && arg2 == 1 ) ;
+        }
         return result ;
       } ) ;
   },
@@ -1393,8 +1429,11 @@ var OpHandler = {
         var result = arg1 - arg2 ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
         pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
-        pdp11.psw.setV( result == 0100000 ) ;
-        pdp11.psw.setC( arg2 == 1 && arg1 == 0 ) ;
+        if( width == Pdp11._WIDTH_WORD )
+          pdp11.psw.setV( arg1 == 0x8000 ) ;
+        else
+          pdp11.psw.setV( arg1 == 0x80 ) ;
+        pdp11.psw.setC( arg1 == 0 && arg2 == 1 ) ;
         return result ;
       } ) ;
   },
@@ -1412,47 +1451,61 @@ var OpHandler = {
     pdp11._getPc( ).writeWord( pdp11._getPc( ).readWord( ) + ( to_int8( des ) * 2 ) ) ;
   },
 
-  rol: function( pdp11, proc, code, ahead, width ) {
-    var val = Processor.setRel( code & 0000077, pdp11, proc, ahead, width, -1,
-      function( arg1, arg2 ) {
-        return ( ( arg1 << 1 ) | ( ( arg1 & 0x8000 ) >> 15 ) ) & 0xffff ;
+  rol: function( pdp11, code, width ) {
+    pdp11._loadAndStore( code & 0000077, width, 0,
+      function( arg1, arg2, pdp11 ) {
+        if( width == Pdp11._WIDTH_WORD )
+          result = ( ( arg1 << 1 ) | ( ( arg1 & 0x8000 ) >> 15 ) ) & 0xffff ;
+        else
+          result = ( ( arg1 << 1 ) | ( ( arg1 & 0x80 ) >> 7 ) ) & 0xff ;
+        pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        if( width == Pdp11._WIDTH_WORD )
+          pdp11.psw.setC( arg1 & 0x8000 ) ;
+        else
+          pdp11.psw.setC( arg1 & 0x80 ) ;
+        pdp11.psw.setV( pdp11.psw.getN( ) ^ pdp11.psw.getC( ) ) ;
+        return result ;
       } ) ;
-    pdp11.setFlag( val ) ;
-    pdp11.ps.c = val & 1 ;
-    pdp11.ps.v = pdp11.ps.n ^ pdp11.ps.c ;
   },
 
   ror: function( pdp11, code, width ) {
-    pdp11._loadAndStore( code & 0000077, width, -1,
+    pdp11._loadAndStore( code & 0000077, width, 0,
       function( arg1, arg2, pdp11 ) {
-        result = ( ( arg1 >> 1 ) | ( ( arg1 & 1 ) << 15 ) ) & 0xffff ;
+        if( width == Pdp11._WIDTH_WORD )
+          result = ( ( arg1 >> 1 ) | ( ( arg1 & 1 ) << 15 ) ) & 0xffff ;
+        else
+          result = ( ( arg1 >> 1 ) | ( ( arg1 & 1 ) << 7 ) ) & 0xff ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
-        pdp11.psw.setC( result & 0x8000 ) ; // not right logic
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        pdp11.psw.setC( arg1 & 1 ) ;
         pdp11.psw.setV( pdp11.psw.getN( ) ^ pdp11.psw.getC( ) ) ;
         return result ;
       } ) ;
   },
 
   asr: function( pdp11, code, width ) {
-    pdp11._loadAndStore( code & 0000077, width, 1,
+    pdp11._loadAndStore( code & 0000077, width, 0,
       function( arg1, arg2, pdp11 ) {
-        var result = ( arg1 >> arg2 ) ;
+        var result = ( arg1 >> 1 ) ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
-        pdp11.psw.setC( result & 1 ) ; // not right logic
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        pdp11.psw.setC( arg1 & 1 ) ;
         pdp11.psw.setV( pdp11.psw.getN( ) ^ pdp11.psw.getC( ) ) ;
         return result ;
       } ) ;
   },
 
   asl: function( pdp11, code, width ) {
-    pdp11._loadAndStore( code & 0000077, width, 1,
+    pdp11._loadAndStore( code & 0000077, width, 0,
       function( arg1, arg2, pdp11 ) {
-        var result = ( arg1 << arg2 ) ;
+        var result = ( arg1 << 1 ) ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
-        pdp11.psw.setZ( result == 0 ? true : false ) ;
-        pdp11.psw.setC( result & 0x8000 ) ; // not right logic
+        pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
+        if( width == Pdp11._WIDTH_WORD )
+          pdp11.psw.setC( arg1 & 0x8000 ) ;
+        else
+          pdp11.psw.setC( arg1 & 0x80 ) ;
         pdp11.psw.setV( pdp11.psw.getN( ) ^ pdp11.psw.getC( ) ) ;
         return result ;
       } ) ;
