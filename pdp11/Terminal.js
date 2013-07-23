@@ -11,7 +11,7 @@ function Terminal( pdp11 ) {
   this.rsr = new Register( ) ;
   this.rbr = new Register( ) ;
   this.xsr = new Register( ) ;
-  this.xbr = new Register( ) ;
+  this.xbr = new RegisterWithCallBack( this.checkXbr.bind( this ) ) ;
   this.xsr.writeBit( Terminal._XSR_DONE_BIT, true ) ;
   this.pdp11 = pdp11 ;
   this.display = __displayview ;
@@ -19,7 +19,7 @@ function Terminal( pdp11 ) {
   this.busy = false ;
 }
 
-Terminal._INTERVAL = 400 ;
+Terminal._INTERVAL = 200 ;
 
 Terminal._RSR_BUSY_BIT = 11 ;
 Terminal._RSR_DONE_BIT = 7 ;
@@ -37,7 +37,7 @@ Terminal.prototype.run = function( ) {
 
   this.step++ ;
   if( this.step >= Terminal._INTERVAL && this.xbr.readWord( )
-      /* && ! this.xsr.readBit( Terminal._XSR_DONE_BIT ) */ ) {
+      && ! this.xsr.readBit( Terminal._XSR_DONE_BIT ) ) {
     if( this.xbr.readWord( ) != 0177 &&
         ( this.xbr.readWord( ) & 0x7f ) != 0xd ) { // temporal
       this.display.innerHTML +=
@@ -50,6 +50,13 @@ Terminal.prototype.run = function( ) {
       this.pdp11.interrupt( Terminal._OUTPUT_INTERRUPT_LEVEL,
                             Terminal._OUTPUT_INTERRUPT_VECTOR ) ;
     }
+    this.step = 0 ;
+  }
+} ;
+
+Terminal.prototype.checkXbr = function( ) {
+  if( this.xbr.readWord( ) ) {
+    this.xsr.writeBit( Terminal._XSR_DONE_BIT, false ) ;
     this.step = 0 ;
   }
 } ;
