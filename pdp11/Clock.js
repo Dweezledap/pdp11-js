@@ -25,6 +25,7 @@ Clock.prototype.run = function( ) {
   this.step++ ;
   if( this.step >= Clock._INTERVAL && this.register.readBit( Clock._ENABLE_INTERRUPT_BIT ) ) {
     this.pdp11.interrupt( Clock._INTERRUPT_LEVEL, Clock._INTERRUPT_VECTOR ) ;
+    this.register.writeBit( Clock._ENABLE_INTERRUPT_BIT, false ) ;
     this.step = 0 ;
   }
 } ;

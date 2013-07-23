@@ -209,7 +209,7 @@ Mmu.prototype._convert = function( v_address ) {
     throw RangeError( '' ) ;
   }
   if( p_address == Mmu._TRAP_POINT )  // temporal
-    throw new RangeError( '' ) ;
+    throw new Error( '' ) ;
 
   return p_address ;
 } ;

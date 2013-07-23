@@ -315,7 +315,8 @@ Pdp11.prototype.run = function( ) {
 
         self.trap_vector = 0 ;
         __logger.log( self.dump( ) ) ;
-      } else if( self.interrupt_vector && self.interrupt_level > self.psw.getPriority( ) ) {
+      } else if( self._checkInterrupt( ) ) {
+//      } else if( self.interrupt_vector && self.interrupt_level > self.psw.getPriority( ) ) {
         __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
 //        console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
         var tmp_psw = self.psw.readWord( ) ;
@@ -659,8 +660,23 @@ Pdp11.prototype._popStack = function( ) {
 
 // not implemented yet.
 Pdp11.prototype.interrupt = function( level, vector ) {
-  this.interrupt_level = level ;
-  this.interrupt_vector = vector ;
+  this.br[ level ].push( { 'level' : level, 'vector' : vector } ) ;
+//  this.interrupt_level = level ;
+//  this.interrupt_vector = vector ;
+} ;
+
+Pdp11.prototype._checkInterrupt = function( ) {
+  for( var i = 7; i >= 0; i-- ) {
+    if( i <= this.psw.getPriority( ) )
+      break ;
+    if( this.br[ i ].length > 0 ) {
+      var interrupt = this.br[ i ].shift( ) ;
+      this.interrupt_level = interrupt.level ;
+      this.interrupt_vector = interrupt.vector ;
+      return true ;
+    }
+  }
+  return false ;
 } ;
 
 // not implemented yet.
@@ -1074,8 +1090,12 @@ var SingleOperandInstructions = {
         pdp11.psw.setV( false ) ;
       // TODO: check Exception type.
       } catch( e ) {
-        __logger.log( e.stack ) ;
-        pdp11.trap( 004 ) ;
+        if( e.name == 'Error' ) {
+          __logger.log( e.stack ) ;
+          pdp11.trap( 004 ) ;
+        } else {
+          throw e ;
+        }
       }
   } },
   'mfpd' :
