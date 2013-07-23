@@ -20,7 +20,7 @@ function Pdp11( ) {
   this.terminal = new Terminal( this ) ;
   this.disk = new Disk( this ) ;
 
-  this.mmu = new Mmu( ) ;
+  this.mmu = new Mmu( this ) ;
   this.mmu.setApr( this.apr ) ;
   this.mmu.setPsw( this.psw ) ;
   this.mmu.setClock( this.clock ) ;
@@ -380,11 +380,16 @@ Pdp11.prototype.run = function( ) {
         console.log( buffer ) ;
       }
     } catch( e ) {
-      console.log( format( code ) + ':' + op.op ) ;
-      console.log( e.stack ) ;
-      __logger.log( e.stack ) ;
-      self._dumpLog( ) ;
-      throw e ;
+      // temporal
+      if( e.name == 'RangeError' ) {
+        self.trap( 0250 ) ;
+      } else {
+        console.log( format( code ) + ':' + op.op ) ;
+        console.log( e.stack ) ;
+        __logger.log( e.stack ) ;
+        self._dumpLog( ) ;
+        throw e ;
+      }
     }
   }
   if( ! self.stop )
@@ -535,9 +540,9 @@ Pdp11.prototype._store = function( num, width, value ) {
   switch( mode ) {
 
     case 0:
-//      if( width == Pdp11._WIDTH_BYTE )
-//        reg.writeLowByte( value ) ;
-//      else
+      if( width == Pdp11._WIDTH_BYTE )
+        reg.writeLowByte( value ) ;
+      else
         reg.writeWord( value ) ;
       break ;
 
@@ -920,7 +925,7 @@ var SingleOperandInstructions = {
       } else {
         pdp11._loadAndStore( code & 0000077, Pdp11._WIDTH_WORD, 0,
           function( arg1, arg2, pdp11 ) {
-            var result = ( ( arg1 & 0xff ) << 8 ) | ( ( arg2 & 0xff00 ) >> 8 ) ;
+            var result = ( ( arg1 & 0xff ) << 8 ) | ( ( arg1 & 0xff00 ) >> 8 ) ;
             pdp11.psw.setN( ( result & 0x80 ) ) ; // correct?
             pdp11.psw.setZ( ( result & 0xff ) == 0 ) ; // correct?
             pdp11.psw.setV( false ) ;
@@ -1311,8 +1316,10 @@ var OpHandler = {
     var result = pdp11._load( ( code & 0007700 ) >> 6, width ) ;
 
     // temporal
-    if( width == Pdp11._WIDTH_BYTE && ( result & 0x80 ) ) {
-      result |= 0xff00 ;
+    if( width == Pdp11._WIDTH_BYTE && ( code & 0000070 ) == 0 ) {
+      width = Pdp11._WIDTH_WORD ;
+      if( result & 0x80 )
+        result |= 0xff00 ;
     }
 
     pdp11._store( code & 0000077, width, result ) ;

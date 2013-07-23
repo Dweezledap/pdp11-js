@@ -2,6 +2,7 @@
  *
  */
 
+__jsimport( "pdp11/Pdp11.js" ) ;
 __jsimport( "pdp11/Psw.js" ) ;
 __jsimport( "pdp11/Apr.js" ) ;
 __jsimport( "pdp11/Memory.js" ) ;
@@ -9,7 +10,8 @@ __jsimport( "pdp11/Clock.js" ) ;
 __jsimport( "pdp11/Terminal.js" ) ;
 __jsimport( "pdp11/Register.js" ) ;
 
-function Mmu( ) {
+function Mmu( pdp11 ) {
+  this.pdp11 = pdp11 ;
   this.psw = null ;
   this.apr = null ;
   this.memory = null ;
@@ -20,7 +22,7 @@ function Mmu( ) {
   this.ssr2 = new Register( ) ;
 }
 
-Mmu._TRAP_POINT = 0xf00 << 6 ; // temporal
+Mmu._TRAP_POINT = 0760000 ; // temporal
 
 Mmu.prototype.setPsw = function( psw ) {
   this.psw = psw ;
@@ -162,10 +164,11 @@ Mmu.prototype.storeWordIntoPreviousUserSpace = function( v_address, value ) {
 Mmu.prototype.loadWordFromPreviousUserSpace = function( v_address ) {
   var tmp = this.psw.getCurrentMode( ) ;
   this.psw.setCurrentMode( this.psw.getPreviousMode( ) ) ;
-  var p_address = this._convert( v_address ) ;
-  this.psw.setCurrentMode( tmp ) ;
-  if( p_address == Mmu._TRAP_POINT )  // temporal
-    throw new RangeError( '' ) ;
+  try {
+    var p_address = this._convert( v_address ) ;
+  } finally {
+    this.psw.setCurrentMode( tmp ) ;
+  }
   return this.loadWordByPhysicalAddress( p_address ) ;
 } ;
 
@@ -187,7 +190,26 @@ Mmu.prototype._convert = function( v_address ) {
   var index = ( v_address >> 13 ) & 0x7 ;
   var base = ( this.apr.getPar( index ).readWord( ) & 0xfff ) << 6 ;
   var offset = v_address & 0x1fff ;
+  var blockNum = offset >> 6
   var p_address = base + offset;
+
+  var length = this.apr.getPdr( index ).readPartial( 8, 0x7f ) ;
+  var ed = this.apr.getPdr( index ).readBit( 3 ) ;
+  var control = this.apr.getPdr( index ).readPartial( 1, 0x3 ) ;
+
+  // temporal
+  if( ( ed && blockNum < length ) || ( ! ed && blockNum > length ) ) {
+    this.ssr2.writeWord( this.pdp11._getPc( ).readWord( ) ) ;
+    // TODO: confirm
+    var sr0 = ( 1 << 14 ) | 1 ;
+    sr0 |= ( v_address >> 12 ) & ~1 ;
+    if( ! this.psw.currentModeIsKernel( ) )
+      sr0 |= ( 1 << 5 ) | ( 1 << 6 ) ;
+    this.ssr0.writeWord( sr0 ) ;
+    throw RangeError( '' ) ;
+  }
+  if( p_address == Mmu._TRAP_POINT )  // temporal
+    throw new RangeError( '' ) ;
 
   return p_address ;
 } ;
