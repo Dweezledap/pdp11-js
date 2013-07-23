@@ -784,12 +784,14 @@ var OneHalfOperandInstructions = {
         pdp11._getReg( reg + 0 ).writeWord( ( result & 0xffff0000 ) >> 8 ) ;
         pdp11._getReg( reg + 1 ).writeWord( result & 0xffff ) ;
       } else {
+        // TODO:confirm
         pdp11._getReg( reg + 0 ).writeWord( result & 0xffff ) ;
       }
-      pdp11.psw.setN( pdp11._isNegative( result, Pdp11._WIDTH_WORD ) ) ;
-      pdp11.psw.setZ( pdp11._isZero( result, Pdp11._WIDTH_WORD ) ) ;
+      pdp11.psw.setN( result & 0x80000000 ) ;
+      pdp11.psw.setZ( ( result & 0xffffffff ) == 0 ) ;
       pdp11.psw.setV( false ) ;
-      pdp11.psw.setC( result > 0xffffffff || result < -0x100000000 ? true : false ) ;
+      // TODO:confirm
+      pdp11.psw.setC( result < ( 1 << 15 ) || result >= ( ( 1 << 15 ) - 1 ) ) ;
   } },
   // TODO: confirm
   'div' :
@@ -797,8 +799,10 @@ var OneHalfOperandInstructions = {
     run : function( pdp11, code ) {
       var reg = ( code & 0000700 ) >> 6 ;
       var src = pdp11._load( code & 0000077, Pdp11._WIDTH_WORD ) ;
-      var value = ( ( pdp11._getReg( reg + 0 ).readWord( ) ) << 16 )
-                     | ( pdp11._getReg( reg + 1 ).readWord( ) ) & 0xffffffff ;
+      var value = (
+                    ( pdp11._getReg( reg + 0 ).readWord( ) << 16 ) |
+                    ( pdp11._getReg( reg + 1 ).readWord( ) )
+                  ) & 0xffffffff ;
       var quotient = parseInt( value / src ) & 0xffff ;
       var remainder = ( value % src ) & 0xffff ;
       pdp11._getReg( reg + 0 ).writeWord( quotient ) ;
@@ -861,7 +865,7 @@ var OneHalfOperandInstructions = {
         pdp11.psw.setN( result & 0x80000000 ) ;
         pdp11.psw.setZ( ( result & 0xffffffff ) == 0 ) ;
         pdp11.psw.setV( ( result ^ value ) & 0x80000000 ) ;
-        pdp11.psw.setC( result & 0x100000000 ) ;
+        pdp11.psw.setC( ( value >> ( 32 - src ) ) & 1 ) ;
         pdp11._getReg( reg_num + 0 ).writeWord( ( result & 0xffff0000 ) >> 16 ) ;
         pdp11._getReg( reg_num + 1 ).writeWord( result & 0xffff ) ;
       }
@@ -1202,19 +1206,52 @@ var OpCode = [
 
   { judge : 0177777, value : 0170011, op : 'setd',  type : OpType.I_OTHER,
     run : function( pdp11, proc, code, ahead ) { } },
-  { judge : 0177777, value : 0000241, op : 'clc',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000261, op : 'sec',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000242, op : 'clv',   type : OpType.I_CONDITION },
+  { judge : 0177777, value : 0000241, op : 'clc',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setC( false ) ;
+  } },
+  { judge : 0177777, value : 0000261, op : 'sec',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setC( true ) ;
+  } },
+  { judge : 0177777, value : 0000242, op : 'clv',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setV( false ) ;
+  } },
   { judge : 0177777, value : 0000262, op : 'sev',   type : OpType.I_CONDITION,
     run : function( pdp11, code ) {
       pdp11.psw.setV( true ) ;
   } },
-  { judge : 0177777, value : 0000244, op : 'clz',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000264, op : 'sez',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000254, op : 'cln',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000274, op : 'sen',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000257, op : 'ccc',   type : OpType.I_CONDITION },
-  { judge : 0177777, value : 0000277, op : 'scc',   type : OpType.I_CONDITION },
+  { judge : 0177777, value : 0000244, op : 'clz',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setZ( false ) ;
+  } },
+  { judge : 0177777, value : 0000264, op : 'sez',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setZ( true ) ;
+  } },
+  { judge : 0177777, value : 0000254, op : 'cln',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setN( false ) ;
+  } },
+  { judge : 0177777, value : 0000274, op : 'sen',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setN( true ) ;
+  } },
+  { judge : 0177777, value : 0000257, op : 'ccc',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setC( false ) ;
+      pdp11.psw.setV( false ) ;
+      pdp11.psw.setZ( false ) ;
+      pdp11.psw.setN( false ) ;
+  } },
+  { judge : 0177777, value : 0000277, op : 'scc',   type : OpType.I_CONDITION,
+    run : function( pdp11, code ) {
+      pdp11.psw.setC( true ) ;
+      pdp11.psw.setV( true ) ;
+      pdp11.psw.setZ( true ) ;
+      pdp11.psw.setN( true ) ;
+  } },
   { judge : 0177000, value : 0004000, op : 'jsr',   type : OpType.I_JSR,
     run : function( pdp11, code ) {
       var reg  = pdp11._calculateOperandAddress( ( code & 0000700 ) >> 6, Pdp11._WIDTH_WORD ) ;
@@ -1444,10 +1481,13 @@ var OpHandler = {
   rol: function( pdp11, code, width ) {
     pdp11._loadAndStore( code & 0000077, width, 0,
       function( arg1, arg2, pdp11 ) {
-        if( width == Pdp11._WIDTH_WORD )
-          result = ( ( arg1 << 1 ) | ( ( arg1 & 0x8000 ) >> 15 ) ) & 0xffff ;
-        else
-          result = ( ( arg1 << 1 ) | ( ( arg1 & 0x80 ) >> 7 ) ) & 0xff ;
+        if( width == Pdp11._WIDTH_WORD ) {
+          result = ( arg1 << 1 ) & 0xffff ;
+        } else {
+          result = ( arg1 << 1 ) & 0xff ;
+        }
+        if( pdp11.psw.getC( ) )
+          result |= 1 ;
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
         pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
         if( width == Pdp11._WIDTH_WORD )
@@ -1462,10 +1502,15 @@ var OpHandler = {
   ror: function( pdp11, code, width ) {
     pdp11._loadAndStore( code & 0000077, width, 0,
       function( arg1, arg2, pdp11 ) {
-        if( width == Pdp11._WIDTH_WORD )
-          result = ( ( arg1 >> 1 ) | ( ( arg1 & 1 ) << 15 ) ) & 0xffff ;
-        else
-          result = ( ( arg1 >> 1 ) | ( ( arg1 & 1 ) << 7 ) ) & 0xff ;
+        if( width == Pdp11._WIDTH_WORD ) {
+          result = ( arg1 >> 1 ) & 0xffff ;
+          if( pdp11.psw.getC( ) )
+            result |= 0x8000 ;
+        } else {
+          result = ( arg1 >> 1 ) & 0xff ;
+          if( pdp11.psw.getC( ) )
+            result |= 0x80 ;
+        }
         pdp11.psw.setN( pdp11._isNegative( result, width ) ) ;
         pdp11.psw.setZ( pdp11._isZero( result, width ) ) ;
         pdp11.psw.setC( arg1 & 1 ) ;
