@@ -299,7 +299,7 @@ Pdp11.prototype.run = function( ) {
 
       if( self.psw.getTrap( ) ) {
         __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
-//        console.log( "trap occured. " + format( self.trap_vector ) ) ;
+        console.log( "trap occured. " + format( self.trap_vector ) ) ;
         self.psw.setTrap( false ) ;
         var tmp_psw = self.psw.readWord( ) ;
         var tmp_pc = self._getPc( ).readWord( ) ;
@@ -314,7 +314,7 @@ Pdp11.prototype.run = function( ) {
         self.psw.setPreviousMode( tmp_mode ) ;
 
         self.trap_vector = 0 ;
-        __logger.log( self.dump( ) ) ;
+//        __logger.log( self.dump( ) ) ;
       } else if( self._checkInterrupt( ) ) {
 //      } else if( self.interrupt_vector && self.interrupt_level > self.psw.getPriority( ) ) {
         __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
@@ -335,7 +335,7 @@ Pdp11.prototype.run = function( ) {
         self.interrupt_vector = 0 ;
         self.interrupt_level = 0 ;
         self.wait = false ;
-        __logger.log( self.dump( ) ) ;
+//        __logger.log( self.dump( ) ) ;
       }
 
       if( self.wait ) {
