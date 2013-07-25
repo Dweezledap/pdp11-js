@@ -199,7 +199,8 @@ Mmu.prototype._convert = function( v_address ) {
 
   // temporal
   if( ( ed && blockNum < length ) || ( ! ed && blockNum > length ) ) {
-    this.ssr2.writeWord( this.pdp11._getPc( ).readWord( ) ) ;
+//    this.ssr2.writeWord( this.pdp11._getPc( ).readWord( ) ) ;
+    this.ssr2.writeWord( this.pdp11.prePc ) ;
     // TODO: confirm
     var sr0 = ( 1 << 14 ) | 1 ;
     sr0 |= ( v_address >> 12 ) & ~1 ;

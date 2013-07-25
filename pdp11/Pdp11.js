@@ -46,6 +46,7 @@ function Pdp11( ) {
   this.wait = false ;
   this.stop = false ;
   this.clockStep = 0 ;
+  this.prePc = 0 ;
 
   this.disassembler = new Disassembler( this ) ;
 }
@@ -290,8 +291,8 @@ Pdp11.prototype.run = function( ) {
     }
     try {
 
-      if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
-        __logger.log( self.dump( ) ) ;
+//      if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
+//        __logger.log( self.dump( ) ) ;
 
       self.clock.run( ) ;
       self.terminal.run( ) ;
@@ -299,7 +300,7 @@ Pdp11.prototype.run = function( ) {
 
       if( self.psw.getTrap( ) ) {
         __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
-        console.log( "trap occured. " + format( self.trap_vector ) ) ;
+//        console.log( "trap occured. " + format( self.trap_vector ) ) ;
         self.psw.setTrap( false ) ;
         var tmp_psw = self.psw.readWord( ) ;
         var tmp_pc = self._getPc( ).readWord( ) ;
@@ -316,7 +317,6 @@ Pdp11.prototype.run = function( ) {
         self.trap_vector = 0 ;
 //        __logger.log( self.dump( ) ) ;
       } else if( self._checkInterrupt( ) ) {
-//      } else if( self.interrupt_vector && self.interrupt_level > self.psw.getPriority( ) ) {
         __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
 //        console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
         var tmp_psw = self.psw.readWord( ) ;
@@ -343,6 +343,7 @@ Pdp11.prototype.run = function( ) {
         continue ;
       }
 
+/*
       if( __logger.level != Logger.NONE_LEVEL ) {
         var symbol = null ;
         var num = 0 ;
@@ -357,20 +358,26 @@ Pdp11.prototype.run = function( ) {
         else
           __logger.log( format( self._getPc( ).readWord( ) ) + ':' ) ;
       }
-
+*/
+      self.prePc = self._getPc( ).readWord( ) ;
       var code = self._fetch( ) ;
       var op = self._decode( code ) ;
 
-      if( __logger.level != Logger.NONE_LEVEL )
+      if( __logger.level != Logger.NONE_LEVEL ) {
+        __logger.log( 'pc:' + self._getPc( ).readWord( ) + ' cur_mode:' + self.psw.getCurrentMode( ) ) ;
         __logger.log( self.disassembler.run( op, code ) ) ;
+      }
 
       op.run( self, code ) ;
+
+/*
       if( __logger.level != Logger.NONE_LEVEL ) {
         if( self.psw.currentModeIsKernel( ) && symbolName != symbol && symbol != 'csv' && symbol != 'cret' ) {
           symbolName = symbol ;
           self._addHistory( symbolName ) ;
         }
       }
+*/
       if( op && op.op == 'trap' ) {
         var buffer = 'trap ' + SystemCall[ code & 0xff ].name ;
         if( ( code & 0xff ) == 0 ) {
