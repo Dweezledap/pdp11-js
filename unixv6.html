@@ -62,13 +62,17 @@ var loadUnixV6DiskImage = function( ) {
 
 // TODO: optimize
 var exportDiskImage = function( ) {
+  var view = document.getElementById( 'diskImage' ) ;
+  while( view.firstChild )
+    view.removeChild( view.firstChild )
+
   var buffer = pdp11.disk.exportBuffer( ) ;
   var blob = new Blob( [ new Uint8Array( buffer ) ] ) ;
   var a = document.createElement( 'a' ) ;
   a.download = 'v6bin' ;
   a.href = window.URL.createObjectURL( blob ) ;
   a.textContent = 'disk image' ;
-  document.getElementsByTagName( 'body' )[ 0 ].appendChild( a ) ;
+  view.appendChild( a ) ;
 //  open( window.URL.createObjectURL( blob ), false ) ;
 } ;
 
@@ -77,6 +81,8 @@ var initPdp11 = function( buffer ) {
   document.getElementById( 'exportButton' ).disabled = false ;
   document.getElementById( 'resetButton' ).disabled = false ;
   document.getElementById( 'stopButton' ).disabled = false ;
+  document.getElementById( 'stopButton' ).textContent = 'stop' ;
+
   __displayview.focus( ) ;
 
   // 0xc6 : inode number of /rkunix  temporary work.
@@ -126,7 +132,17 @@ var displayInitialMessage = function( ) {
 
 // TODO: implement
 var stopPdp11 = function( ) {
-  pdp11.stop = true ;
+  if( ! pdp11 )
+    return ;
+  var button = document.getElementById( 'stopButton' ) ;
+  if( button.textContent == 'stop' ) {
+    pdp11.stop = true ;
+    button.textContent = 'restart' ;
+  } else {
+    pdp11.stop = false ;
+    button.textContent = 'stop' ;
+    pdp11.run( ) ;
+  }
 } ;
 
 var lognum_change = function( ) {
@@ -135,6 +151,15 @@ var lognum_change = function( ) {
 
 var loglevel_change = function( ) {
   __logger.setLevel( parseInt( __loglevel.selectedOptions.item( ).value ) ) ;
+} ;
+
+var changeDebugState = function( flag ) {
+  var view = document.getElementById( 'debugView' ) ;
+  if( flag ) {
+    view.style.cssText = '' ;
+  } else {
+    view.style.cssText = 'display: none' ;
+  }
 } ;
 
 var inputTerminal = function( e ) {
@@ -162,12 +187,25 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 <button id='exportButton' onclick="exportDiskImage( )">export Disk image</button>
 <button id='resetButton' onclick="resetPdp11( )">reset</button>
 <button id='stopButton' onclick="stopPdp11( )">stop</button>
+<span id='diskImage'></span>
+<span id='traceLog'></span>
 </p>
 
 <p>
 <textarea id="displayview" cols="80" rows="20" readonly="readonly" onkeypress='inputTerminal( event )'> </textarea>
 </p>
 
+<p>
+debug (under construction) <input type='checkbox' id='debug' onchange='changeDebugState( this.checked )' />
+</p>
+
+<span id='debugView' style='display: none'>
+<p>
+instructions <input type='checkbox' id='instructions' />
+trap & interrupt <input type='checkbox' id='instructions' />
+system call <input type='checkbox' id='systemcall' />
+kernel symbol <input type='checkbox' id='symbols' />
+</p>
 
 <p>
 <select id="loglevel" onchange="loglevel_change( )">
@@ -194,6 +232,8 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 <p>
 <textarea id="logview" cols="80" rows="20"> </textarea>
 </p>
+
+</span>
 
 </body>
 </html>

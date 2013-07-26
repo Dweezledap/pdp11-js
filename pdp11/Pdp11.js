@@ -283,64 +283,64 @@ Pdp11.prototype.run = function( ) {
   var self = this ;
   var symbolName = null ;
   var runStep = function( ) {
-  for( var count = 0; count < Pdp11._LOOP; count++ ) {
-    if( self.stop ) {
-      self._dumpLog( ) ;
-      break ;
-    }
-    try {
+    for( var count = 0; count < Pdp11._LOOP; count++ ) {
+      if( self.stop ) {
+        self._dumpLog( ) ;
+        return ;
+      }
+      try {
 
 //      if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
 //        __logger.log( self.dump( ) ) ;
 
-      self.clock.run( ) ;
-      self.terminal.run( ) ;
-      self.disk.run( ) ;
+        self.clock.run( ) ;
+        self.terminal.run( ) ;
+        self.disk.run( ) ;
 
-      if( self.psw.getTrap( ) ) {
-        __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
-//        console.log( "trap occured. " + format( self.trap_vector ) ) ;
-        self.psw.setTrap( false ) ;
-        var tmp_psw = self.psw.readWord( ) ;
-        var tmp_pc = self._getPc( ).readWord( ) ;
-        var tmp_mode = self.psw.getCurrentMode( ) ;
+        if( self.psw.getTrap( ) ) {
+//          __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
+//          console.log( "trap occured. " + format( self.trap_vector ) ) ;
+          self.psw.setTrap( false ) ;
+          var tmp_psw = self.psw.readWord( ) ;
+          var tmp_pc = self._getPc( ).readWord( ) ;
+          var tmp_mode = self.psw.getCurrentMode( ) ;
 
-        self.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
-        self._pushStack( tmp_psw ) ;
-        self._pushStack( tmp_pc ) ;
+          self.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
+          self._pushStack( tmp_psw ) ;
+          self._pushStack( tmp_pc ) ;
 
-        self._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector ) ) ;
-        self.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector + 2 ) ) ;
-        self.psw.setPreviousMode( tmp_mode ) ;
+          self._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector ) ) ;
+          self.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector + 2 ) ) ;
+          self.psw.setPreviousMode( tmp_mode ) ;
 
-        self.trap_vector = 0 ;
+          self.trap_vector = 0 ;
 //        __logger.log( self.dump( ) ) ;
-      } else if( self._checkInterrupt( ) ) {
-        __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
+        } else if( self._checkInterrupt( ) ) {
+//          __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
 //        console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
-        var tmp_psw = self.psw.readWord( ) ;
-        var tmp_pc = self._getPc( ).readWord( ) ;
-        var tmp_mode = self.psw.getCurrentMode( ) ;
+          var tmp_psw = self.psw.readWord( ) ;
+          var tmp_pc = self._getPc( ).readWord( ) ;
+          var tmp_mode = self.psw.getCurrentMode( ) ;
 
-        self.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
+          self.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
 
-        self._pushStack( tmp_psw ) ;
-        self._pushStack( tmp_pc ) ;
+          self._pushStack( tmp_psw ) ;
+          self._pushStack( tmp_pc ) ;
 
-        self._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.interrupt_vector ) ) ;
-        self.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.interrupt_vector + 2 ) ) ;
-        self.psw.setPreviousMode( tmp_mode ) ;
+          self._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.interrupt_vector ) ) ;
+          self.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.interrupt_vector + 2 ) ) ;
+          self.psw.setPreviousMode( tmp_mode ) ;
 
-        self.interrupt_vector = 0 ;
-        self.interrupt_level = 0 ;
-        self.wait = false ;
+          self.interrupt_vector = 0 ;
+          self.interrupt_level = 0 ;
+          self.wait = false ;
 //        __logger.log( self.dump( ) ) ;
-      }
+        }
 
-      if( self.wait ) {
+        if( self.wait ) {
 //        console.log( "wait" ) ;
-        continue ;
-      }
+          continue ;
+        }
 
 /*
       if( __logger.level != Logger.NONE_LEVEL ) {
@@ -358,16 +358,16 @@ Pdp11.prototype.run = function( ) {
           __logger.log( format( self._getPc( ).readWord( ) ) + ':' ) ;
       }
 */
-      self.prePc = self._getPc( ).readWord( ) ;
-      var code = self._fetch( ) ;
-      var op = self._decode( code ) ;
+        self.prePc = self._getPc( ).readWord( ) ;
+        var code = self._fetch( ) ;
+        var op = self._decode( code ) ;
 
-      if( __logger.level != Logger.NONE_LEVEL ) {
-        __logger.log( 'pc:' + self._getPc( ).readWord( ) + ' cur_mode:' + self.psw.getCurrentMode( ) ) ;
-        __logger.log( self.disassembler.run( op, code ) ) ;
-      }
+        if( __logger.level != Logger.NONE_LEVEL ) {
+          __logger.log( 'pc:' + self._getPc( ).readWord( ) + ' cur_mode:' + self.psw.getCurrentMode( ) ) ;
+          __logger.log( self.disassembler.run( op, code ) ) ;
+        }
 
-      op.run( self, code ) ;
+        op.run( self, code ) ;
 
 /*
       if( __logger.level != Logger.NONE_LEVEL ) {
@@ -377,41 +377,45 @@ Pdp11.prototype.run = function( ) {
         }
       }
 */
-      if( op && op.op == 'trap' ) {
-        var buffer = 'trap ' + SystemCall[ code & 0xff ].name ;
-        if( ( code & 0xff ) == 0 ) {
-          var tmp = self.mmu.loadWord( self._getPc( ).readWord( ) ) ;
-          var sys_op = self.mmu.loadWord( tmp ) ;
-          buffer += '(' + SystemCall[ sys_op & 0xff ].name + ')' ;
+        if( false && op && op.op == 'trap' ) {
+          var buffer = 'trap ' + SystemCall[ code & 0xff ].name ;
+          if( ( code & 0xff ) == 0 ) {
+            var tmp = self.mmu.loadWord( self._getPc( ).readWord( ) ) ;
+            var sys_op = self.mmu.loadWord( tmp ) ;
+            buffer += '(' + SystemCall[ sys_op & 0xff ].name + ')' ;
+          }
+          console.log( buffer ) ;
         }
-        console.log( buffer ) ;
-      }
-    } catch( e ) {
-      // temporal
-      if( e.name == 'RangeError' ) {
-        self.trap( 0250 ) ;
-      } else {
-        console.log( format( code ) + ':' + op.op ) ;
-        console.log( e.stack ) ;
-        __logger.log( e.stack ) ;
-        self._dumpLog( ) ;
-        throw e ;
+      } catch( e ) {
+        // temporal
+        if( e.name == 'RangeError' ) {
+          self.trap( 0250 ) ;
+        } else {
+          console.log( format( code ) + ':' + op.op ) ;
+          console.log( e.stack ) ;
+          __logger.log( e.stack ) ;
+          self._dumpLog( ) ;
+          throw e ;
+        }
       }
     }
-  }
-  if( ! self.stop )
     setTimeout( runStep, 0 ) ;
   } ;
   runStep( ) ;
 } ;
 
+// TODO: move to appropriate class.
 Pdp11.prototype._dumpLog = function( ) {
-  if( __logger.getUrl ) {
+  if( false && __logger.getUrl ) {
+    var view = document.getElementById( 'traceLog' ) ;
+    while( view.firstChild )
+      view.removeChild( view.firstChild )
+
     var a = document.createElement( 'a' ) ;
     a.download = 'log' ;
     a.href = __logger.getUrl( ) ;
     a.textContent = 'log' ;
-    document.getElementsByTagName( 'body' )[ 0 ].appendChild( a ) ;
+    view.appendChild( a ) ;
 //    open( __logger.getUrl( ), false ) ;
   }
 }
