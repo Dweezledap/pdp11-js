@@ -44,14 +44,13 @@ var dropDiskImage = function( event ) {
 
 } ;
 
-// TODO: make it work.
 var loadUnixV6DiskImage = function( ) {
   var request = new XMLHttpRequest( ) ;
   request.responseType = 'arraybuffer' ;
   request.onload = function( ) {
     initPdp11( request.response ) ;
   } ;
-  request.open( 'GET', __unixV6DiskImageURL, false ) ;
+  request.open( 'GET', __unixV6DiskImageURL, true ) ;
   request.send( null ) ;
 } ;
 
