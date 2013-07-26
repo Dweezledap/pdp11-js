@@ -19,12 +19,11 @@ function Disk( pdp11 ) {
   this.rkcs.writeWord( 0x80 ) ;
 
   var buffer = new ArrayBuffer( Disk._CAPACITY ) ;
-  this.uint8  = new Uint8Array( buffer ) ;
   this.uint16 = new Uint16Array( buffer ) ;
-  this.int16  = new Int16Array( buffer ) ;
 
   this.step = 0 ;
   this.busy = false ;
+  this.length = 0 ;
 }
 
 Disk._CAPACITY = 512 * 4800 * 8 ; // 512bytes x 4800records x 8drives
@@ -132,11 +131,20 @@ Disk.prototype._runStore = function( ) {
   }
 } ;
 
-Disk.prototype.storeBuffer = function( buffer ) {
-  var array = new Uint8Array( buffer ) ;
-  for( var i = 0; i < array.byteLength; i++ ) {
-    this.uint8[ i ] = array[ i ] ;
+Disk.prototype.importBuffer = function( buffer ) {
+  var array = new Uint16Array( buffer ) ;
+  for( var i = 0; i < array.length; i++ ) {
+    this.uint16[ i ] =  array[ i ] ;
   }
+  this.length = array.length ;
+} ;
+
+Disk.prototype.exportBuffer = function( ) {
+  var array = new Uint16Array( this.length ) ;
+  for( var i = 0; i < this.length; i++ ) {
+    array[ i ] = this.uint16[ i ] ;
+  }
+  return array.buffer ;
 } ;
 
 Disk.prototype._loadWord = function( address ) {

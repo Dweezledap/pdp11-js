@@ -17,31 +17,21 @@
 var terminal ;
 var pdp11 ;
 var __loglevel ;
+var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin' ;
 
-window.addEventListener( 'dragover', function( event ) {
+// TODO: maybe better to change the function name;
+var dragOver = function( event ) {
   event.preventDefault( ) ;
-}, false ) ;
+} ;
 
-window.addEventListener( 'drop', function( event ) {
+var dropDiskImage = function( event ) {
 
   event.preventDefault( ) ;
   var file = event.dataTransfer.files[ 0 ] ;
 
   var reader = new FileReader( ) ;
   reader.onload = function( event ) {
-    // 0xc6 : inode number of /rkunix  temporary work.
-    // TODO : make the boot loader.
-    var bin_data = object( BinData ).create( event.target.result ) ;
-    var inode = object( Inode ).create( 0xc6, bin_data ) ;
-    var file = object( File ).create( inode ) ;
-    var exe = object( Exe ).create( file ) ;
-
-    pdp11 = new Pdp11( ) ;
-    terminal = pdp11.terminal ;
-    pdp11.memory.storeBuffer( exe.buffer( ) ) ;
-    pdp11.disk.storeBuffer( event.target.result ) ;
-    pdp11.setSymbols( exe.symbols( ) ) ;
-    pdp11.run( ) ;
+    initPdp11( event.target.result ) ;
   } ;
   reader.onerror = function( e ) {
     __displayview.innerHTML += 'Error!<br />' ;
@@ -52,25 +42,67 @@ window.addEventListener( 'drop', function( event ) {
   };
   reader.readAsArrayBuffer( file ) ;
 
-}, false ) ;
+} ;
 
+// TODO: make it work.
+var loadUnixV6DiskImage = function( ) {
+  var request = new XMLHttpRequest( ) ;
+  request.responseType = 'arraybuffer' ;
+  request.onload = function( ) {
+    initPdp11( request.response ) ;
+  } ;
+  request.open( 'GET', __unixV6DiskImageURL, false ) ;
+  request.send( null ) ;
+} ;
 
-function init( ) {
+// TODO: optimize
+var exportDiskImage = function( ) {
+  var buffer = pdp11.disk.exportBuffer( ) ;
+  var blob = new Blob( [ new Uint8Array( buffer ) ] ) ;
+  var a = document.createElement( 'a' ) ;
+  a.download = 'v6bin' ;
+  a.href = window.URL.createObjectURL( blob ) ;
+  a.textContent = 'disk image' ;
+  document.getElementsByTagName( 'body' )[ 0 ].appendChild( a ) ;
+//  open( window.URL.createObjectURL( blob ), false ) ;
+} ;
+
+var initPdp11 = function( buffer ) {
+  // 0xc6 : inode number of /rkunix  temporary work.
+  // TODO: make the boot loader.
+  var bin_data = object( BinData ).create( buffer ) ;
+  var inode = object( Inode ).create( 0xc6, bin_data ) ;
+  var file = object( File ).create( inode ) ;
+  var exe = object( Exe ).create( file ) ;
+
+  pdp11 = new Pdp11( ) ;
+  terminal = pdp11.terminal ;
+  pdp11.memory.storeBuffer( exe.buffer( ) ) ;
+  pdp11.disk.importBuffer( buffer ) ;
+  pdp11.setSymbols( exe.symbols( ) ) ;
+  pdp11.run( ) ;
+} ;
+
+// TODO: implement
+var resetPdp11 = function( ) {
+} ;
+
+var init = function( ) {
   __displayview = document.getElementById( "displayview" ) ;
   __logview = document.getElementById( "logview" ) ;
   __lognum = document.getElementById( "lognum" ) ;
   __loglevel = document.getElementById( "loglevel" ) ;
-}
+} ;
 
-stop_pdp11 = function( ) {
+var stop_pdp11 = function( ) {
   pdp11.stop = true ;
 } ;
 
-lognum_change = function( ) {
+var lognum_change = function( ) {
   __logview.setAttribute( "rows", parseInt( __lognum.selectedOptions.item( ).value ) + 1 ) ;
 } ;
 
-loglevel_change = function( ) {
+var loglevel_change = function( ) {
   __logger.setLevel( parseInt( __loglevel.selectedOptions.item( ).value ) ) ;
 } ;
 
@@ -86,9 +118,26 @@ document.onkeypress = function( e ) {
   e.preventDefault( ) ;
 } ;
 
+window.addEventListener( 'drop', dropDiskImage, false ) ;
+window.addEventListener( 'dragover', dragOver, false ) ;
+
 </script>
 </head>
+
 <body onLoad="init( )">
+
+<p>
+<button onclick="loadUnixV6DiskImage( )">load UNIX V6 image</button>
+</p>
+
+<p>
+<button onclick="exportDiskImage( )">export Disk image</button>
+</p>
+
+<p>
+<button onclick="resetPdp11( )">reset</button>
+</p>
+
 <p>
 <textarea id="displayview" cols="80" rows="20" readonly="readonly"></textarea>
 </p>

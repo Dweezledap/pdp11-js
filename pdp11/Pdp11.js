@@ -28,12 +28,14 @@ function Pdp11( ) {
   this.mmu.setMemory( this.memory ) ;
   this.mmu.setDisk( this.disk ) ;
 
+  // TODO: use unified registers except for stack point register.
   this.kernelRegs = new Array( ) ;
   this.userRegs = new Array( ) ;
   for( var i = 0; i < Pdp11._NUM_OF_REGISTERS; i++ ) {
     this.kernelRegs.push( new Register( ) ) ;
     this.userRegs.push( new Register( ) ) ;
   }
+
   this.symbols = { } ;
   this.history = [ ] ;
   this.br = [ ] ;
@@ -45,7 +47,6 @@ function Pdp11( ) {
   this.trap_vector = 0 ;
   this.wait = false ;
   this.stop = false ;
-  this.clockStep = 0 ;
   this.prePc = 0 ;
 
   this.disassembler = new Disassembler( this ) ;
@@ -153,8 +154,6 @@ Pdp11.prototype._decode = function( code ) {
     switch( code & 0177700 ) {
       case 0000300:
         return SingleOperandInstructions[ 'swab' ] ;
-//      case 0100300:
-//        return SingleOperandInstructions[ 'bpl' ] ;
       case 0005000:
         return SingleOperandInstructions[ 'clr' ] ;
       case 0105000:
