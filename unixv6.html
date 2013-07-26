@@ -51,7 +51,7 @@ var loadUnixV6DiskImage = function( ) {
   request.onload = function( ) {
     initPdp11( request.response ) ;
   } ;
-  request.open( 'GET', __unixV6DiskImageURL, false ) ;
+  request.open( 'GET', __unixV6DiskImageURL, true ) ;
   request.send( null ) ;
 } ;
 
