@@ -3,6 +3,7 @@
  */
 
 __jsimport( "pdp11/Register.js" ) ;
+__jsimport( "pdp11/TextAreaView.js" ) ;
 
 /**
  *
@@ -14,7 +15,7 @@ function Terminal( pdp11 ) {
   this.xbr = new RegisterWithCallBack( this.checkXbr.bind( this ) ) ;
   this.xsr.writeBit( Terminal._XSR_DONE_BIT, true ) ;
   this.pdp11 = pdp11 ;
-  this.display = __displayview ;
+  this.view = new TextAreaView( "displayview" ) ;
   this.step = 0 ;
   this.busy = false ;
 }
@@ -40,9 +41,7 @@ Terminal.prototype.run = function( ) {
       && ! this.xsr.readBit( Terminal._XSR_DONE_BIT ) ) {
     if( this.xbr.readWord( ) != 0177 &&
         ( this.xbr.readWord( ) & 0x7f ) != 0xd ) { // temporal
-      this.display.innerHTML +=
-        String.fromCharCode( this.xbr.readWord( ) & 0x7f ) ;
-      this.display.scrollTop = this.display.scrollHeight ;
+      this.view.output( String.fromCharCode( this.xbr.readWord( ) & 0x7f ) ) ;
     }
     this.xsr.writeBit( Terminal._XSR_DONE_BIT, true ) ;
     this.xbr.writeWord( 0 ) ;

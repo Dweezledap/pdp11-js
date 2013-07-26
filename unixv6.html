@@ -6,6 +6,7 @@
 <script type="text/javascript" src="pdp11/Import.js"></script>
 
 <script type="text/javascript" src="pdp11/object.js"></script>
+<script type="text/javascript" src="pdp11/TextAreaView.js"></script>
 <script type="text/javascript" src="pdp11/BinData.js"></script>
 <script type="text/javascript" src="pdp11/Inode.js"></script>
 <script type="text/javascript" src="pdp11/File.js"></script>
@@ -18,6 +19,7 @@ var terminal ;
 var pdp11 ;
 var __loglevel ;
 var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin' ;
+var __displayview ;
 
 // TODO: maybe better to change the function name;
 var dragOver = function( event ) {
@@ -34,13 +36,13 @@ var dropDiskImage = function( event ) {
     initPdp11( event.target.result ) ;
   } ;
   reader.onerror = function( e ) {
-    __displayview.innerHTML += 'Error!<br />' ;
-    __displayview.innerHTML += '<br />' ;
+    __displayview.outputLine( 'Error!' ) ;
     for( var key in reader.error ) {
-      __displayview.innerHTML += key + '=' + reader.error[ key ] + '<br />' ;
+      __displayview.output( key + '=' + reader.error[ key ] + '<br />' ) ;
     }
-  };
+  } ;
   reader.readAsArrayBuffer( file ) ;
+  __displayview.outputLine( 'loading image...' ) ;
 
 } ;
 
@@ -50,8 +52,12 @@ var loadUnixV6DiskImage = function( ) {
   request.onload = function( ) {
     initPdp11( request.response ) ;
   } ;
+  request.onerror = function( e ) {
+    __displayview.outputLine( 'Error!' ) ;
+  } ;
   request.open( 'GET', __unixV6DiskImageURL, true ) ;
   request.send( null ) ;
+  __displayview.outputLine( 'loading image...' ) ;
 } ;
 
 // TODO: optimize
@@ -67,6 +73,12 @@ var exportDiskImage = function( ) {
 } ;
 
 var initPdp11 = function( buffer ) {
+  document.getElementById( 'loadV6Button' ).disabled = true ;
+  document.getElementById( 'exportButton' ).disabled = false ;
+  document.getElementById( 'resetButton' ).disabled = false ;
+  document.getElementById( 'stopButton' ).disabled = false ;
+  __displayview.focus( ) ;
+
   // 0xc6 : inode number of /rkunix  temporary work.
   // TODO: make the boot loader.
   var bin_data = object( BinData ).create( buffer ) ;
@@ -82,18 +94,38 @@ var initPdp11 = function( buffer ) {
   pdp11.run( ) ;
 } ;
 
-// TODO: implement
+// TODO: make it run as specification
 var resetPdp11 = function( ) {
+  if( pdp11 )
+    initPdp11( pdp11.disk.exportBuffer( ) ) ;
 } ;
 
 var init = function( ) {
-  __displayview = document.getElementById( "displayview" ) ;
+  document.getElementById( 'exportButton' ).disabled = true ;
+  document.getElementById( 'resetButton' ).disabled = true ;
+  document.getElementById( 'stopButton' ).disabled = true ;
+  __displayview = new TextAreaView( 'displayview' ) ;
   __logview = document.getElementById( "logview" ) ;
   __lognum = document.getElementById( "lognum" ) ;
   __loglevel = document.getElementById( "loglevel" ) ;
+  displayInitialMessage( ) ;
 } ;
 
-var stop_pdp11 = function( ) {
+var displayInitialMessage = function( ) {
+  __displayview.outputLine( 'Drag and drop your UNIX V6 disk image here or' ) ;
+  __displayview.outputLine( 'press the "load UNIX V6 Disk image" button to run UNIX V6.' ) ;
+  __displayview.outputLine( '' ) ;
+  __displayview.outputLine( 'After that, enter "root" when "login: " is displayed.' ) ;
+  __displayview.outputLine( '' ) ;
+  __displayview.outputLine( 'I confirmed only it runs on the combination of Windows and Chrome.' ) ;
+  __displayview.outputLine( '' ) ;
+  __displayview.outputLine( '           ' +
+                            ' Enjoy UNIX V6 on your web browser! -- Takahiro(@superhoge)' ) ;
+  __displayview.outputLine( '' ) ;
+} ;
+
+// TODO: implement
+var stopPdp11 = function( ) {
   pdp11.stop = true ;
 } ;
 
@@ -105,7 +137,7 @@ var loglevel_change = function( ) {
   __logger.setLevel( parseInt( __loglevel.selectedOptions.item( ).value ) ) ;
 } ;
 
-document.onkeypress = function( e ) {
+var inputTerminal = function( e ) {
   var keyCode = e.keyCode ;
 
   if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
@@ -126,24 +158,16 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 <body onLoad="init( )">
 
 <p>
-<button onclick="loadUnixV6DiskImage( )">load UNIX V6 image</button>
+<button id='loadV6Button' onclick='loadUnixV6DiskImage( )'>load UNIX V6 Disk image</button>
+<button id='exportButton' onclick="exportDiskImage( )">export Disk image</button>
+<button id='resetButton' onclick="resetPdp11( )">reset</button>
+<button id='stopButton' onclick="stopPdp11( )">stop</button>
 </p>
 
 <p>
-<button onclick="exportDiskImage( )">export Disk image</button>
+<textarea id="displayview" cols="80" rows="20" readonly="readonly" onkeypress='inputTerminal( event )'> </textarea>
 </p>
 
-<p>
-<button onclick="resetPdp11( )">reset</button>
-</p>
-
-<p>
-<textarea id="displayview" cols="80" rows="20" readonly="readonly"></textarea>
-</p>
-
-<p>
-<button onclick="stop_pdp11( )">stop</button>
-</p>
 
 <p>
 <select id="loglevel" onchange="loglevel_change( )">
@@ -153,9 +177,7 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 <option value="4">ERROR</option>
 <option value="5" selected>NONE</option>
 </select>
-</p>
 
-<p>
 <select id="lognum" onchange="lognum_change( )">
 <option value="1">1</option>
 <option value="10">10</option>
@@ -170,9 +192,8 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 </p>
 
 <p>
-<textarea id="logview" cols="80" rows="20"></textarea>
+<textarea id="logview" cols="80" rows="20"> </textarea>
 </p>
-
 
 </body>
 </html>
