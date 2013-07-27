@@ -15,11 +15,11 @@
 
 <script type="text/javascript">
 
-var terminal ;
 var pdp11 ;
-var __loglevel ;
 var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin' ;
-var __displayview ;
+var __terminalView ;
+var __debugView ;
+var __debugOn ;
 
 // TODO: maybe better to change the function name;
 var dragOver = function( event ) {
@@ -36,13 +36,13 @@ var dropDiskImage = function( event ) {
     initPdp11( event.target.result ) ;
   } ;
   reader.onerror = function( e ) {
-    __displayview.outputLine( 'Error!' ) ;
+    __terminalView.outputLine( 'Error!' ) ;
     for( var key in reader.error ) {
-      __displayview.output( key + '=' + reader.error[ key ] + '<br />' ) ;
+      __terminalView.output( key + '=' + reader.error[ key ] + '<br />' ) ;
     }
   } ;
   reader.readAsArrayBuffer( file ) ;
-  __displayview.outputLine( 'loading image...' ) ;
+  __terminalView.outputLine( 'loading image...' ) ;
 
 } ;
 
@@ -53,11 +53,11 @@ var loadUnixV6DiskImage = function( ) {
     initPdp11( request.response ) ;
   } ;
   request.onerror = function( e ) {
-    __displayview.outputLine( 'Error!' ) ;
+    __terminalView.outputLine( 'Error!' ) ;
   } ;
   request.open( 'GET', __unixV6DiskImageURL, true ) ;
   request.send( null ) ;
-  __displayview.outputLine( 'loading image...' ) ;
+  __terminalView.outputLine( 'loading image...' ) ;
 } ;
 
 // TODO: optimize
@@ -83,7 +83,7 @@ var initPdp11 = function( buffer ) {
   document.getElementById( 'stopButton' ).disabled = false ;
   document.getElementById( 'stopButton' ).textContent = 'stop' ;
 
-  __displayview.focus( ) ;
+  __terminalView.focus( ) ;
 
   // 0xc6 : inode number of /rkunix  temporary work.
   // TODO: make the boot loader.
@@ -92,11 +92,11 @@ var initPdp11 = function( buffer ) {
   var file = object( File ).create( inode ) ;
   var exe = object( Exe ).create( file ) ;
 
-  pdp11 = new Pdp11( ) ;
-  terminal = pdp11.terminal ;
+  pdp11 = new Pdp11( __terminalView ) ;
   pdp11.memory.storeBuffer( exe.buffer( ) ) ;
   pdp11.disk.importBuffer( buffer ) ;
   pdp11.setSymbols( exe.symbols( ) ) ;
+  changeDebugFlags( ) ;
   pdp11.run( ) ;
 } ;
 
@@ -110,24 +110,24 @@ var init = function( ) {
   document.getElementById( 'exportButton' ).disabled = true ;
   document.getElementById( 'resetButton' ).disabled = true ;
   document.getElementById( 'stopButton' ).disabled = true ;
-  __displayview = new TextAreaView( 'displayview' ) ;
-  __logview = document.getElementById( "logview" ) ;
-  __lognum = document.getElementById( "lognum" ) ;
-  __loglevel = document.getElementById( "loglevel" ) ;
+  __terminalView = new TextAreaView( 'terminalView' ) ;
+  __debugView = new LimitedLinesTextAreaView( 'debugView' ) ;
+  document.getElementById( 'instructionCheck' ).disabled = true ;
+  document.getElementById( 'kernelSymbolCheck' ).disabled = true ;
   displayInitialMessage( ) ;
 } ;
 
 var displayInitialMessage = function( ) {
-  __displayview.outputLine( 'Drag and drop your UNIX V6 disk image here or' ) ;
-  __displayview.outputLine( 'press the "load UNIX V6 Disk image" button to run UNIX V6.' ) ;
-  __displayview.outputLine( '' ) ;
-  __displayview.outputLine( 'After that, enter "root" when "login: " is displayed.' ) ;
-  __displayview.outputLine( '' ) ;
-  __displayview.outputLine( 'I confirmed only it runs on the combination of Windows and Chrome.' ) ;
-  __displayview.outputLine( '' ) ;
-  __displayview.outputLine( '           ' +
-                            ' Enjoy UNIX V6 on your web browser! -- Takahiro(@superhoge)' ) ;
-  __displayview.outputLine( '' ) ;
+  __terminalView.outputLine( 'Drag and drop your UNIX V6 disk image here or' ) ;
+  __terminalView.outputLine( 'press the "load UNIX V6 Disk image" button to run UNIX V6.' ) ;
+  __terminalView.outputLine( '' ) ;
+  __terminalView.outputLine( 'After that, enter "root" when "login: " is displayed.' ) ;
+  __terminalView.outputLine( '' ) ;
+  __terminalView.outputLine( 'I confirmed only it runs on the combination of Windows and Chrome.' ) ;
+  __terminalView.outputLine( '' ) ;
+  __terminalView.outputLine( '           ' +
+                            'Enjoy UNIX V6 on your web browser! -- Takahiro(@superhoge)' ) ;
+  __terminalView.outputLine( '' ) ;
 } ;
 
 // TODO: implement
@@ -154,11 +154,27 @@ var loglevel_change = function( ) {
 } ;
 
 var changeDebugState = function( flag ) {
-  var view = document.getElementById( 'debugView' ) ;
+  var view = document.getElementById( 'debugArea' ) ;
+  __debugOn = flag ;
   if( flag ) {
     view.style.cssText = '' ;
+    changeDebugFlags( ) ;
   } else {
     view.style.cssText = 'display: none' ;
+    __debugView.clear( ) ;
+    if( pdp11 ) {
+      for( var key in pdp11.debugFlags ) {
+        pdp11.debugFlags[ key ] = false ;
+      }
+    }
+  }
+} ;
+
+var changeDebugFlags = function( ) {
+  if( ! pdp11 || ! __debugOn )
+    return ;
+  for( var key in pdp11.debugFlags ) {
+    pdp11.debugFlags[ key ] = document.getElementById( key + 'Check' ).checked ;
   }
 } ;
 
@@ -168,8 +184,8 @@ var inputTerminal = function( e ) {
   if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
     keyCode += 0x20 ;
   }
-  if( terminal )
-    terminal.input( keyCode ) ;
+  if( pdp11 )
+    pdp11.terminal.input( keyCode ) ;
 //  console.log( format( keyCode ) + ':' + String.fromCharCode( keyCode & 0x7f ) ) ;
   e.preventDefault( ) ;
 } ;
@@ -194,45 +210,29 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 </p>
 
 <p>
-<textarea id="displayview" cols="80" rows="20" readonly="readonly" onkeypress='inputTerminal( event )'> </textarea>
+<textarea id="terminalView" cols="80" rows="20" readonly="readonly" onkeypress='inputTerminal( event )'> </textarea>
 </p>
 
 <p>
 debug (under construction) <input type='checkbox' id='debug' onchange='changeDebugState( this.checked )' />
 </p>
 
-<span id='debugView' style='display: none'>
+<span id='debugArea' style='display: none'>
 <p>
-instructions <input type='checkbox' id='instructions' />
-trap & interrupt <input type='checkbox' id='instructions' />
-system call <input type='checkbox' id='systemcall' />
-kernel symbol <input type='checkbox' id='symbols' />
+instruction
+<input type='checkbox' id='instructionCheck' onclick='changeDebugFlags( )' />
+trap
+<input type='checkbox' id='trapCheck' onclick='changeDebugFlags( )' />
+interrupt
+<input type='checkbox' id='interruptCheck' onclick='changeDebugFlags( )' />
+system call
+<input type='checkbox' id='systemCallCheck' onclick='changeDebugFlags( )' checked/>
+kernel symbol
+<input type='checkbox' id='kernelSymbolCheck' onclick='changeDebugFlags( )' />
 </p>
 
 <p>
-<select id="loglevel" onchange="loglevel_change( )">
-<option value="1">DEBUG</option>
-<option value="2">LOG</option>
-<option value="3">WARN</option>
-<option value="4">ERROR</option>
-<option value="5" selected>NONE</option>
-</select>
-
-<select id="lognum" onchange="lognum_change( )">
-<option value="1">1</option>
-<option value="10">10</option>
-<option value="20" selected>20</option>
-<option value="40">40</option>
-<option value="80">80</option>
-<option value="160">160</option>
-<option value="320">320</option>
-<option value="640">640</option>
-<option value="1280">1280</option>
-</select>
-</p>
-
-<p>
-<textarea id="logview" cols="80" rows="20"> </textarea>
+<textarea id="debugView" cols="80" rows="20" readonly="readonly"> </textarea>
 </p>
 
 </span>

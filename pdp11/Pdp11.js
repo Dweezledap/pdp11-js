@@ -1,3 +1,7 @@
+/**
+ * PDP-11/40 processor
+ */
+
 __jsimport( "pdp11/Memory.js" ) ;
 __jsimport( "pdp11/Psw.js" ) ;
 __jsimport( "pdp11/Apr.js" ) ;
@@ -10,14 +14,17 @@ __jsimport( "pdp11/Util.js" ) ;
 __jsimport( "pdp11/Disassembler.js" ) ;
 __jsimport( "pdp11/SystemCall.js" ) ;
 
-function Pdp11( ) {
+/**
+ *
+ */
+function Pdp11( terminalView ) {
   // may be better to move these lines to other class.
   this.memory = new Memory( ) ;
   this.psw = new Psw( ) ;
   this.apr = new Apr( ) ;
   this.apr.setPsw( this.psw ) ;
   this.clock = new Clock( this ) ;
-  this.terminal = new Terminal( this ) ;
+  this.terminal = new Terminal( this, terminalView ) ;
   this.disk = new Disk( this ) ;
 
   this.mmu = new Mmu( this ) ;
@@ -49,6 +56,14 @@ function Pdp11( ) {
   this.stop = false ;
   this.prePc = 0 ;
 
+  this.debugFlags = {
+    'instruction' : false,
+    'trap' : false,
+    'interrupt' : false,
+    'systemCall' : false,
+    'kernelSymbol' : false
+  } ;
+
   this.disassembler = new Disassembler( this ) ;
 }
 
@@ -63,10 +78,16 @@ Pdp11._HISTORY_LENGTH = 20 ;
 
 Pdp11._LOOP = 4000 ; // temporary
 
+/**
+ *
+ */
 Pdp11.prototype.setSymbols = function( symbols ) {
   this.symbols = symbols ;
 } ;
 
+/**
+ *
+ */
 Pdp11.prototype._getReg = function( index ) {
   // temporal
   if( index != 6 ) {
@@ -298,7 +319,9 @@ Pdp11.prototype.run = function( ) {
         self.disk.run( ) ;
 
         if( self.psw.getTrap( ) ) {
-//          __logger.log( "trap occured. " + format( self.trap_vector ) ) ;
+          if( self.debugFlags[ 'trap' ] ) {
+            __debugView.outputLine( "trap occured. " + format( self.trap_vector ) ) ;
+          }
 //          console.log( "trap occured. " + format( self.trap_vector ) ) ;
           self.psw.setTrap( false ) ;
           var tmp_psw = self.psw.readWord( ) ;
@@ -316,7 +339,9 @@ Pdp11.prototype.run = function( ) {
           self.trap_vector = 0 ;
 //        __logger.log( self.dump( ) ) ;
         } else if( self._checkInterrupt( ) ) {
-//          __logger.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
+          if( self.debugFlags[ 'interrupt' ] ) {
+            __debugView.outputLine( "interrupt occured. " + format( self.interrupt_vector ) ) ;
+          }
 //        console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
           var tmp_psw = self.psw.readWord( ) ;
           var tmp_pc = self._getPc( ).readWord( ) ;
@@ -342,22 +367,29 @@ Pdp11.prototype.run = function( ) {
           continue ;
         }
 
-/*
-      if( __logger.level != Logger.NONE_LEVEL ) {
-        var symbol = null ;
-        var num = 0 ;
-        for ( var key in self.symbols ) {
-          if( self._getPc( ).readWord( ) >= self.symbols[ key ] && self.symbols[ key ] > num ) {
-            symbol = key ;
-            num = self.symbols[ key ] ;
+        // TODO: move to other class
+        // TODO: optimize
+        if( self.debugFlags[ 'kernelSymbol' ] ) {
+          var symbol = null ;
+          var num = 0 ;
+          for ( var key in self.symbols ) {
+            if( self._getPc( ).readWord( ) >= self.symbols[ key ] && self.symbols[ key ] > num ) {
+              symbol = key ;
+              num = self.symbols[ key ] ;
+            }
           }
-        }
-        if( self.psw.currentModeIsKernel( ) && symbol )
-          __logger.log( format( self._getPc( ).readWord( ) ) + ':' + symbol + '+' + format( self._getPc( ).readWord( ) - self.symbols[ symbol ] ) ) ;
-        else
-          __logger.log( format( self._getPc( ).readWord( ) ) + ':' ) ;
-      }
+          if( self.psw.currentModeIsKernel( ) && symbolName != symbol && symbol != 'csv' && symbol != 'cret' ) {
+            symbolName = symbol ;
+            __debugView.outputLine( symbolName ) ;
+          }
+/*
+          if( self.psw.currentModeIsKernel( ) && symbol )
+            __debugView.outputLine( format( self._getPc( ).readWord( ) ) + ':' + symbol + '+' + format( self._getPc( ).readWord( ) - self.symbols[ symbol ] ) ) ;
+          else
+            __debugView.outputLine( format( self._getPc( ).readWord( ) ) + ':' ) ;
 */
+        }
+
         self.prePc = self._getPc( ).readWord( ) ;
         var code = self._fetch( ) ;
         var op = self._decode( code ) ;
@@ -367,24 +399,20 @@ Pdp11.prototype.run = function( ) {
           __logger.log( self.disassembler.run( op, code ) ) ;
         }
 
+        if( self.debugFlags[ 'instruction' ] ) {
+          __debugView.outputLine( op.op ) ;
+        }
+
         op.run( self, code ) ;
 
-/*
-      if( __logger.level != Logger.NONE_LEVEL ) {
-        if( self.psw.currentModeIsKernel( ) && symbolName != symbol && symbol != 'csv' && symbol != 'cret' ) {
-          symbolName = symbol ;
-          self._addHistory( symbolName ) ;
-        }
-      }
-*/
-        if( false && op && op.op == 'trap' ) {
-          var buffer = 'trap ' + SystemCall[ code & 0xff ].name ;
+        if( self.debugFlags[ 'systemCall' ] && op && op.op == 'trap' ) {
+          var buffer = 'systemcall ' + SystemCall[ code & 0xff ].name ;
           if( ( code & 0xff ) == 0 ) {
             var tmp = self.mmu.loadWord( self._getPc( ).readWord( ) ) ;
             var sys_op = self.mmu.loadWord( tmp ) ;
             buffer += '(' + SystemCall[ sys_op & 0xff ].name + ')' ;
           }
-          console.log( buffer ) ;
+          __debugView.outputLine( buffer ) ;
         }
       } catch( e ) {
         // temporal
@@ -649,14 +677,6 @@ Pdp11.prototype._isZero = function( val, width ) {
   return false ;
 } ;
 
-Pdp11.prototype._hasCarry = function( val, width ) {
-  if( width == Pdp11._WIDTH_WORD && ( val > 0xffff || val < -0x10000 ) )
-    return true ;
-  if( width == Pdp11._WIDTH_BYTE && ( val > 0xff || val < -0x100 ) )
-    return true ;
-  return false ;
-} ;
-
 Pdp11.prototype._pushStack = function( val ) {
   this._getSp( ).decrementWord( ) ;
   this.mmu.storeWord( this._getSp( ).readWord( ), val ) ;
@@ -671,8 +691,6 @@ Pdp11.prototype._popStack = function( ) {
 // not implemented yet.
 Pdp11.prototype.interrupt = function( level, vector ) {
   this.br[ level ].push( { 'level' : level, 'vector' : vector } ) ;
-//  this.interrupt_level = level ;
-//  this.interrupt_vector = vector ;
 } ;
 
 Pdp11.prototype._checkInterrupt = function( ) {
