@@ -8,16 +8,17 @@ __jsimport( "pdp11/TextAreaView.js" ) ;
 /**
  *
  */
-function Terminal( pdp11 ) {
+function Terminal( pdp11, view ) {
   this.rsr = new Register( ) ;
   this.rbr = new Register( ) ;
   this.xsr = new Register( ) ;
   this.xbr = new RegisterWithCallBack( this.checkXbr.bind( this ) ) ;
   this.xsr.writeBit( Terminal._XSR_DONE_BIT, true ) ;
   this.pdp11 = pdp11 ;
-  this.view = new TextAreaView( "displayview" ) ;
+  this.view = view ;
   this.step = 0 ;
   this.busy = false ;
+  this.view.clear( ) ;
 }
 
 Terminal._INTERVAL = 200 ;
