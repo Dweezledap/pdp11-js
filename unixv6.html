@@ -20,6 +20,7 @@ var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin
 var __terminalView ;
 var __debugView ;
 var __debugOn ;
+var __figureWindow ;
 
 // TODO: maybe better to change the function name;
 var dragOver = function( event ) {
@@ -97,6 +98,7 @@ var initPdp11 = function( buffer ) {
   pdp11.disk.importBuffer( buffer ) ;
   pdp11.setSymbols( exe.symbols( ) ) ;
   changeDebugFlags( ) ;
+  pdp11.loadBootRom( ) ;
   pdp11.run( ) ;
 } ;
 

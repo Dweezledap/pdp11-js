@@ -78,11 +78,33 @@ Pdp11._HISTORY_LENGTH = 20 ;
 
 Pdp11._LOOP = 4000 ; // temporary
 
+Pdp11._BOOT_ROM_FOR_RK05 = [
+  012700,
+  177414,
+  005040,
+  005040,
+  010040,
+  012740,
+  000005,
+  105710,
+  002376,
+  005007
+] ;
+
+Pdp11._BOOT_DATA_ADDRESS = 0100000 ;
+
 /**
  *
  */
 Pdp11.prototype.setSymbols = function( symbols ) {
   this.symbols = symbols ;
+} ;
+
+Pdp11.prototype.loadBootRom = function( ) {
+  for( var i = 0; i < Pdp11._BOOT_ROM_FOR_RK05.length; i++ ) {
+    this.memory.storeWord( Pdp11._BOOT_DATA_ADDRESS + i, Pdp11._BOOT_ROM_FOR_RK05[ i ] ) ;
+  }
+  this._getPc( ).writeWord( Pdp11._BOOT_DATA_ADDRESS ) ;
 } ;
 
 /**
@@ -427,9 +449,27 @@ Pdp11.prototype.run = function( ) {
         }
       }
     }
-    setTimeout( runStep, 0 ) ;
+    self._asyncCall( runStep ) ;
   } ;
   runStep( ) ;
+} ;
+
+Pdp11.prototype._asyncCall = function( func ) {
+/*
+  var script = document.createElement( 'script' ) ;
+  script.onload = function( ) {
+    document.body.removeChild( script ) ;
+    func( ) ;
+  }
+  script.src = 'data:text/javascript,' ;
+  document.body.appendChild( script ) ;
+*/
+  var img = new Image ;
+  img.addEventListener( 'error', func, false ) ;
+  img.src = '' ;
+/*
+  setTimeout( func, 0 ) ;
+*/
 } ;
 
 // TODO: move to appropriate class.

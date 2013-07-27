@@ -42,6 +42,6 @@ Memory.prototype.storeByte = function( address, value ) {
 Memory.prototype.storeBuffer = function( buffer ) {
   var array = new Uint8Array( buffer ) ;
   for( var i = 0; i < array.byteLength; i++ ) {
-    this.uint8[ i ] = array[ i ] ;
+    this.storeByte( i, array[ i ] ) ;
   }
 } ;
