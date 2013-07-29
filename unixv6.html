@@ -1,13 +1,13 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>file</title>
+<title>PDP11 Emulator with UNIX V6</title>
 <script type="text/javascript" src="utility/JsImport.js"></script>
 <script type="text/javascript" src="pdp11/Import.js"></script>
 <script type="text/javascript" src="pdp11/TextAreaView.js"></script>
 <script type="text/javascript">
 
-var pdp11 ;
+var __pdp11 ;
 var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin' ;
 var __terminalView ;
 var __debugView ;
@@ -15,11 +15,18 @@ var __debugOn ;
 var __debugCanvas ;
 var __figureWindow ;
 
-// TODO: maybe better to change the function name;
+
+/**
+ * TODO: maybe better to change the function name
+ */
 var dragOver = function( event ) {
   event.preventDefault( ) ;
 } ;
 
+
+/**
+ * TODO: appropriate error message.
+ */
 var dropDiskImage = function( event ) {
 
   event.preventDefault( ) ;
@@ -40,6 +47,10 @@ var dropDiskImage = function( event ) {
 
 } ;
 
+
+/**
+ * TODO: appropriate error message.
+ */
 var loadUnixV6DiskImage = function( ) {
   var request = new XMLHttpRequest( ) ;
   request.responseType = 'arraybuffer' ;
@@ -54,22 +65,10 @@ var loadUnixV6DiskImage = function( ) {
   __terminalView.outputLine( 'loading image...' ) ;
 } ;
 
-// TODO: optimize
-var exportDiskImage = function( ) {
-  var view = document.getElementById( 'diskImage' ) ;
-  while( view.firstChild )
-    view.removeChild( view.firstChild )
 
-  var buffer = pdp11.disk.exportBuffer( ) ;
-  var blob = new Blob( [ new Uint8Array( buffer ) ] ) ;
-  var a = document.createElement( 'a' ) ;
-  a.download = 'v6bin' ;
-  a.href = window.URL.createObjectURL( blob ) ;
-  a.textContent = 'disk image' ;
-  view.appendChild( a ) ;
-//  open( window.URL.createObjectURL( blob ), false ) ;
-} ;
-
+/**
+ * @param buffer ArrayBuffer including Disk image
+ */
 var initPdp11 = function( buffer ) {
   document.getElementById( 'loadV6Button' ).disabled = true ;
   document.getElementById( 'exportButton' ).disabled = false ;
@@ -79,19 +78,60 @@ var initPdp11 = function( buffer ) {
 
   __terminalView.focus( ) ;
 
-  pdp11 = new Pdp11( __terminalView, __debugCanvas ) ;
-  pdp11.disk.importBuffer( buffer ) ;
+  __pdp11 = new Pdp11( __terminalView, __debugCanvas ) ;
+  __pdp11.disk.importBuffer( buffer ) ;
   changeDebugFlags( ) ;
-  pdp11.loadBootRom( buffer ) ;
-  pdp11.run( ) ;
+  __pdp11.loadBootRom( buffer ) ;
+  __pdp11.run( ) ;
 } ;
 
-// TODO: make it run as specification
+
+/**
+ * TODO: make it run as specification
+ */
 var resetPdp11 = function( ) {
-  if( pdp11 )
-    initPdp11( pdp11.disk.exportBuffer( ) ) ;
+  if( __pdp11 )
+    initPdp11( __pdp11.disk.exportBuffer( ) ) ;
 } ;
 
+
+/**
+ * TODO: optimize
+ */
+var exportDiskImage = function( ) {
+  var span = document.getElementById( 'diskImageSpan' ) ;
+  while( span.firstChild )
+    span.removeChild( span.firstChild )
+  var buffer = __pdp11.disk.exportBuffer( ) ;
+  var a = document.createElement( 'a' ) ;
+  a.download = 'v6bin' ;
+  a.href = window.URL.createObjectURL( new Blob( [ new Uint8Array( buffer ) ] ) ) ;
+  a.textContent = 'disk image' ;
+  span.appendChild( a ) ;
+} ;
+
+
+/**
+ * TODO: implement
+ */
+var stopPdp11 = function( ) {
+  if( ! __pdp11 )
+    return ;
+  var button = document.getElementById( 'stopButton' ) ;
+  if( button.textContent == 'stop' ) {
+    __pdp11.stop = true ;
+    button.textContent = 'restart' ;
+  } else {
+    __pdp11.stop = false ;
+    button.textContent = 'stop' ;
+    __pdp11.run( ) ;
+  }
+} ;
+
+
+/**
+ *
+ */
 var init = function( ) {
   document.getElementById( 'exportButton' ).disabled = true ;
   document.getElementById( 'resetButton' ).disabled = true ;
@@ -104,6 +144,58 @@ var init = function( ) {
   displayInitialMessage( ) ;
 } ;
 
+
+/**
+ *
+ */
+var changeDebugState = function( flag ) {
+  var span = document.getElementById( 'debugSpan' ) ;
+  __debugOn = flag ;
+  if( flag ) {
+    span.style.cssText = '' ;
+    changeDebugFlags( ) ;
+  } else {
+    span.style.cssText = 'display: none' ;
+    __debugView.clear( ) ;
+    if( __pdp11 ) {
+      for( var key in __pdp11.debugFlags ) {
+        __pdp11.debugFlags[ key ] = false ;
+      }
+    }
+  }
+} ;
+
+
+/**
+ *
+ */
+var changeDebugFlags = function( ) {
+  if( ! __pdp11 || ! __debugOn )
+    return ;
+  for( var key in __pdp11.debugFlags ) {
+    __pdp11.debugFlags[ key ] = document.getElementById( key + 'Check' ).checked ;
+  }
+} ;
+
+
+/**
+ *
+ */
+var inputTerminal = function( e ) {
+  var keyCode = e.keyCode ;
+
+  if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
+    keyCode += 0x20 ;
+  }
+  if( __pdp11 )
+    __pdp11.terminal.input( keyCode ) ;
+  e.preventDefault( ) ;
+} ;
+
+
+/**
+ *
+ */
 var displayInitialMessage = function( ) {
   __terminalView.outputLine( 'Drag and drop your UNIX V6 disk image here or' ) ;
   __terminalView.outputLine( 'press the "load UNIX V6 Disk image" button to run UNIX V6.' ) ;
@@ -121,64 +213,21 @@ var displayInitialMessage = function( ) {
   __terminalView.outputLine( '' ) ;
 } ;
 
-// TODO: implement
-var stopPdp11 = function( ) {
-  if( ! pdp11 )
+
+/**
+ * 
+ */
+var flushLog = function( ) {
+  if( __logger.getUrl == undefined )
     return ;
-  var button = document.getElementById( 'stopButton' ) ;
-  if( button.textContent == 'stop' ) {
-    pdp11.stop = true ;
-    button.textContent = 'restart' ;
-  } else {
-    pdp11.stop = false ;
-    button.textContent = 'stop' ;
-    pdp11.run( ) ;
-  }
-} ;
-
-var lognum_change = function( ) {
-  __logview.setAttribute( "rows", parseInt( __lognum.selectedOptions.item( ).value ) + 1 ) ;
-} ;
-
-var loglevel_change = function( ) {
-  __logger.setLevel( parseInt( __loglevel.selectedOptions.item( ).value ) ) ;
-} ;
-
-var changeDebugState = function( flag ) {
-  var view = document.getElementById( 'debugArea' ) ;
-  __debugOn = flag ;
-  if( flag ) {
-    view.style.cssText = '' ;
-    changeDebugFlags( ) ;
-  } else {
-    view.style.cssText = 'display: none' ;
-    __debugView.clear( ) ;
-    if( pdp11 ) {
-      for( var key in pdp11.debugFlags ) {
-        pdp11.debugFlags[ key ] = false ;
-      }
-    }
-  }
-} ;
-
-var changeDebugFlags = function( ) {
-  if( ! pdp11 || ! __debugOn )
-    return ;
-  for( var key in pdp11.debugFlags ) {
-    pdp11.debugFlags[ key ] = document.getElementById( key + 'Check' ).checked ;
-  }
-} ;
-
-var inputTerminal = function( e ) {
-  var keyCode = e.keyCode ;
-
-  if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
-    keyCode += 0x20 ;
-  }
-  if( pdp11 )
-    pdp11.terminal.input( keyCode ) ;
-//  console.log( format( keyCode ) + ':' + String.fromCharCode( keyCode & 0x7f ) ) ;
-  e.preventDefault( ) ;
+  var span = document.getElementById( 'traceLogSpan' ) ;
+  while( span.firstChild )
+    span.removeChild( span.firstChild )
+  var a = document.createElement( 'a' ) ;
+  a.download = 'log' ;
+  a.href = __logger.getUrl( ) ;
+  a.textContent = 'log' ;
+  span.appendChild( a ) ;
 } ;
 
 window.addEventListener( 'drop', dropDiskImage, false ) ;
@@ -189,42 +238,45 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 
 <body onLoad="init( )">
 
-<p><a href="http://d.hatena.ne.jp/takahirox/20121214/1355490840">If you wanna study UNIX V6 kernel...</a></p>
-
 <p>
-<button id='loadV6Button' onclick='loadUnixV6DiskImage( )'>load UNIX V6 Disk image</button>
-<button id='exportButton' onclick="exportDiskImage( )">export Disk image</button>
-<button id='resetButton' onclick="resetPdp11( )">reset</button>
-<button id='stopButton' onclick="stopPdp11( )">stop</button>
-<span id='diskImage'></span>
-<span id='traceLog'></span>
+<a href="http://d.hatena.ne.jp/takahirox/20121214/1355490840">If you wanna study UNIX V6 kernel...</a>
 </p>
 
 <p>
-<textarea id="terminalView" cols="80" rows="20" readonly="readonly" onkeypress='inputTerminal( event )'> </textarea>
+<button id="loadV6Button" onclick="loadUnixV6DiskImage( )">load UNIX V6 Disk image</button>
+<button id="exportButton" onclick="exportDiskImage( )">export Disk image</button>
+<button id="resetButton" onclick="resetPdp11( )">reset</button>
+<button id="stopButton" onclick="stopPdp11( )">stop</button>
+<span id="diskImageSpan"></span>
+<span id="traceLogSpan"></span>
 </p>
 
 <p>
-debug (under construction) <input type='checkbox' id='debug' onchange='changeDebugState( this.checked )' />
+<textarea id="terminalView" cols="80" rows="20" readonly="readonly" onkeypress="inputTerminal( event )"> </textarea>
 </p>
 
-<span id='debugArea' style='display: none'>
+<p>
+debug (under construction)
+<input type="checkbox" id="debug" onchange="changeDebugState( this.checked )" />
+</p>
+
+<span id="debugSpan" style="display: none">
 <p>
 instruction
-<input type='checkbox' id='instructionCheck' onclick='changeDebugFlags( )' />
+<input type="checkbox" id="instructionCheck" onclick="changeDebugFlags( )" />
 trap
-<input type='checkbox' id='trapCheck' onclick='changeDebugFlags( )' />
+<input type="checkbox" id="trapCheck" onclick="changeDebugFlags( )" />
 interrupt
-<input type='checkbox' id='interruptCheck' onclick='changeDebugFlags( )' />
+<input type="checkbox" id="interruptCheck" onclick="changeDebugFlags( )" />
 system call
-<input type='checkbox' id='systemCallCheck' onclick='changeDebugFlags( )' checked/>
+<input type="checkbox" id="systemCallCheck" onclick="changeDebugFlags( )" checked/>
 kernel symbol
-<input type='checkbox' id='kernelSymbolCheck' onclick='changeDebugFlags( )' />
+<input type="checkbox" id="kernelSymbolCheck" onclick="changeDebugFlags( )" />
 </p>
 
 <p>
 <textarea id="debugView" cols="80" rows="20" readonly="readonly"> </textarea>
-<canvas id="debugCanvas" width="100" height="300" />
+<canvas id="debugCanvas" width="50" height="300" />
 </p>
 
 </span>

@@ -485,8 +485,10 @@ Pdp11.prototype._asyncCall = function( func ) {
 
 // TODO: move to appropriate class.
 Pdp11.prototype._dumpLog = function( ) {
+  flushLog( ) ;
+/*
   if( __logger.getUrl ) {
-    var view = document.getElementById( 'traceLog' ) ;
+    var view = document.getElementById( 'traceLogSpan' ) ;
     while( view.firstChild )
       view.removeChild( view.firstChild )
 
@@ -497,6 +499,7 @@ Pdp11.prototype._dumpLog = function( ) {
     view.appendChild( a ) ;
 //    open( __logger.getUrl( ), false ) ;
   }
+*/
 }
 
 /**
