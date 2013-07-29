@@ -180,9 +180,10 @@ Mmu.prototype._managementIsAvailable = function( ) {
  * TODO: throw exception when invalid access happens.
  */
 Mmu.prototype._convert = function( v_address ) {
+  v_address &= 0xffff ;
   if( ! this._managementIsAvailable( ) ) {
     if( v_address >= 0160000 && v_address < 0180000 ) {
-      v_address |= 0700000 ;
+      return v_address | 0700000 ;
     }
     return v_address ;
   }
@@ -222,18 +223,21 @@ Mmu.prototype.dump = function( ) {
   return buffer ;
 } ;
 
+// TODO: modify
 Mmu.prototype.loadWordByPhysicalAddress = function( p_address ) {
   if( p_address >= 0760000 )
     return this._map( p_address ).readWord( ) ;
   return this.memory.loadWord( p_address ) ;
 } ;
 
+// TODO: modify
 Mmu.prototype.loadByteByPhysicalAddress = function( p_address ) {
   if( p_address >= 0760000 )
     return this._map( p_address ).readLowByte( ) ;
   return this.memory.loadByte( p_address ) ;
 } ;
 
+// TODO: modify
 Mmu.prototype.storeWordByPhysicalAddress = function( p_address, value ) {
   if( p_address >= 0760000 )
     this._map( p_address ).writeWord( value ) ;
@@ -241,6 +245,7 @@ Mmu.prototype.storeWordByPhysicalAddress = function( p_address, value ) {
     this.memory.storeWord( p_address, value ) ;
 } ;
 
+// TODO: modify
 Mmu.prototype.storeByteByPhysicalAddress = function( p_address, value ) {
   if( p_address >= 0760000 )
     this._map( p_address ).writeLowByte( value ) ;

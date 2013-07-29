@@ -16,7 +16,7 @@ function Disk( pdp11 ) {
   this.rkba = new Register( ) ;
   this.rkda = new Register( ) ;
   this.rkdb = new Register( ) ;
-  this.rkcs.writeWord( 0x80 ) ;
+  this.rkcs.writeBit( Disk._RKCS_READY_BIT, true, true ) ;
 
   var buffer = new ArrayBuffer( Disk._CAPACITY ) ;
   this.uint16 = new Uint16Array( buffer ) ;
@@ -44,6 +44,9 @@ Disk._RKDA_CYLINDER_MASK = 0xff ;
 Disk._RKDA_SIDE_MASK     = 0x1 ;
 Disk._RKDA_SECTOR_MASK   = 0xf ;
 
+Disk._RKCS_READY_BIT = 7 ;
+Disk._RKCS_ENABLE_INTERRUPT_BIT = 6 ;
+
 Disk._RKCS_COMMAND_BIT  = 1 ;
 Disk._RKCS_COMMAND_MASK = 0x7 ;
 
@@ -67,8 +70,10 @@ Disk.prototype.run = function( ) {
           break ;
       }
       this.busy = false ;
-      this.rkcs.writeWord( 0x80 ) ; // TODO: error check?
-      this.pdp11.interrupt( Disk._INTERRUPT_LEVEL, Disk._INTERRUPT_VECTOR ) ;
+      this.rkcs.writeBit( Disk._RKCS_READY_BIT, true, true ) ;
+      if( this.rkcs.readBit( Disk._RKCS_ENABLE_INTERRUPT_BIT, true ) ) {
+        this.pdp11.interrupt( Disk._INTERRUPT_LEVEL, Disk._INTERRUPT_VECTOR ) ;
+      }
     }
     this.step = 0 ;
   }
@@ -82,11 +87,11 @@ Disk.prototype.check = function( ) {
 } ;
 
 Disk.prototype._getCommand = function( ) {
-  return this.rkcs.readPartial( Disk._RKCS_COMMAND_BIT, Disk._RKCS_COMMAND_MASK ) ;
+  return this.rkcs.readPartial( Disk._RKCS_COMMAND_BIT, Disk._RKCS_COMMAND_MASK, true ) ;
 } ;
 
 Disk.prototype._go = function( ) {
-  return this.rkcs.readWord( ) & 1 ;
+  return this.rkcs.readWord( true ) & 1 ;
 } ;
 
 Disk.prototype._calculateDiskAddress = function( ) {
@@ -160,9 +165,11 @@ Disk.prototype._dump = function( ) {
   buffer +=   "rkds:" + format( this.rkds.readWord( ) ) ;
   buffer += ", rker:" + format( this.rker.readWord( ) ) ;
   buffer += ", rkcs:" + format( this.rkcs.readWord( ) ) ;
-  buffer += ", rkwc:" + format( this.rkwc.readWord( ) ) + "(" + this._getWordCount( ) + ")" ;
+  buffer += ", rkwc:" + format( this.rkwc.readWord( ) ) 
+         +  "(" + this._getWordCount( ) + ")" ;
   buffer += ", rkba:" + format( this.rkba.readWord( ) ) ;
-  buffer += ", rkda:" + format( this.rkda.readWord( ) ) + "(" + this._calculateDiskAddress( ) + ")" ;
+  buffer += ", rkda:" + format( this.rkda.readWord( ) ) 
+         +  "(" + format( this._calculateDiskAddress( ) / 512 )+ ")" ;
   buffer += ", rkdb:" + format( this.rkdb.readWord( ) ) ;
   return buffer ;
 }

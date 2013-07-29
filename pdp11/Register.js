@@ -8,13 +8,12 @@
  * This prototype provides Register emulation.
  * @author Takahiro <hogehoge@gachapin.jp>
  */
-function Register( callback ) {
+function Register( ) {
     var buffer = new ArrayBuffer( Register._wordSize ) ;
     this.uint8 = new Uint8Array( buffer ) ;
     this.uint16 = new Uint16Array( buffer ) ;
     this.int16 = new Int16Array( buffer ) ;
     this.uint16[ 0 ] = 0 ;
-    this.callback = callback ;
 }
 
 Register._wordSize = 2 ; // 2bytes
@@ -54,11 +53,15 @@ Register.prototype.readHighByte = function( ) {
  * @return 
  */
 Register.prototype.readPartial = function( offset, mask ) {
-  return ( this.readWord( ) >> offset ) & mask ;
+  return this._readPartial( offset, mask ) ;
 } ;
 
 Register.prototype.readBit = function( bit ) {
-  return this.readPartial( bit, 1 ) == 1 ? true : false ;
+  return this._readPartial( bit, 1 ) == 1 ? true : false ;
+} ;
+
+Register.prototype._readPartial = function( offset, mask ) {
+  return ( this.uint16[ 0 ] >> offset ) & mask ;
 } ;
 
 /**
@@ -96,13 +99,17 @@ Register.prototype.writeHighByte = function( value ) {
  * TODO: change 0xffff to word size unspecific one.
  */
 Register.prototype.writePartial = function( value, offset, mask ) {
-  this.writeWord( ( this.readWord( )
-                  & ( 0xffff & ~( mask << offset ) ) )
-                  | ( value << offset ) ) ;
+  this._writePartial( value, offset, mask ) ;
 } ;
 
 Register.prototype.writeBit = function( bit, value ) {
-  this.writePartial( value ? 1 : 0, bit, 1 ) ;
+  this._writePartial( value ? 1 : 0, bit, 1 ) ;
+} ;
+
+Register.prototype._writePartial = function( value, offset, mask ) {
+  this.uint16[ 0 ] = ( ( this.readWord( )
+                       & ( 0xffff & ~( mask << offset ) ) )
+                       | ( value << offset ) ) ;
 } ;
 
 /**
@@ -153,37 +160,77 @@ Register.prototype.decrementByte = function( ) {
 
 __jsimport( "utility/Inherit.js" ) ;
 
-function RegisterWithCallBack( callback ) {
+function RegisterWithCallBack( writeCallback, readCallback ) {
   Register.call( this ) ;
-  this.callback = callback ;
+  this.writeCallback = writeCallback ;
+  this.readCallback = readCallback ;
 }
 
 RegisterWithCallBack.prototype = __inherit( Register.prototype ) ;
 RegisterWithCallBack.prototype.constructor = RegisterWithCallBack ;
 
-RegisterWithCallBack.prototype.writeWord = function( value ) {
+RegisterWithCallBack.prototype._doWriteCallback = function( prevent ) {
+  if( ! prevent && this.writeCallback )
+    this.writeCallback( ) ;
+} ;
+
+RegisterWithCallBack.prototype._doReadCallback = function( prevent ) {
+  if( ! prevent && this.readCallback )
+    this.readCallback( ) ;
+} ;
+
+RegisterWithCallBack.prototype.readWord = function( prevent ) {
+  var value = Register.prototype.readWord.call( this ) ;
+  this._doReadCallback( prevent ) ;
+  return value ;
+} ;
+
+RegisterWithCallBack.prototype.readLowByte = function( prevent ) {
+  var value = Register.prototype.readLowByte.call( this ) ;
+  this._doReadCallback( prevent ) ;
+  return value ;
+} ;
+
+RegisterWithCallBack.prototype.readHighByte = function( prevent ) {
+  var value = Register.prototype.readHighByte.call( this, value ) ;
+  this._doReadCallback( prevent ) ;
+  return value ;
+} ;
+
+RegisterWithCallBack.prototype.readPartial = function( offset, mask, prevent ) {
+  var value = Register.prototype.readPartial.call( this, offset, mask ) ;
+  this._doReadCallback( prevent ) ;
+  return value ;
+} ;
+
+RegisterWithCallBack.prototype.readBit = function( bit, prevent ) {
+  var value = Register.prototype.readBit.call( this, bit ) ;
+  this._doReadCallback( prevent ) ;
+  return value ;
+} ;
+
+RegisterWithCallBack.prototype.writeWord = function( value, prevent ) {
   Register.prototype.writeWord.call( this, value ) ;
-  this.callback( ) ;
+  this._doWriteCallback( prevent ) ;
 } ;
 
-RegisterWithCallBack.prototype.writeLowByte = function( value ) {
+RegisterWithCallBack.prototype.writeLowByte = function( value, prevent ) {
   Register.prototype.writeLowByte.call( this, value ) ;
-  this.callback( ) ;
+  this._doWriteCallback( prevent ) ;
 } ;
 
-RegisterWithCallBack.prototype.writeHighByte = function( value ) {
+RegisterWithCallBack.prototype.writeHighByte = function( value, prevent ) {
   Register.prototype.writeHighByte.call( this, value ) ;
-  this.callback( ) ;
+  this._doWriteCallback( prevent ) ;
 } ;
 
-RegisterWithCallBack.prototype.writePartial = function( value, offset, mask ) {
-  Register.prototype.writePartial.call( this, value ) ;
-  this.callback( ) ;
+RegisterWithCallBack.prototype.writePartial = function( value, offset, mask, prevent ) {
+  Register.prototype.writePartial.call( this, value, offset, mask ) ;
+  this._doWriteCallback( prevent ) ;
 } ;
 
-RegisterWithCallBack.prototype.writeBit = function( bit, value ) {
-  Register.prototype.writeBit.call( this, value ) ;
-  this.callback( ) ;
+RegisterWithCallBack.prototype.writeBit = function( bit, value, prevent ) {
+  Register.prototype.writeBit.call( this, bit, value ) ;
+  this._doWriteCallback( prevent ) ;
 } ;
-
 

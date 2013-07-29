@@ -4,22 +4,16 @@
 <title>file</title>
 <script type="text/javascript" src="utility/JsImport.js"></script>
 <script type="text/javascript" src="pdp11/Import.js"></script>
-
-<script type="text/javascript" src="pdp11/object.js"></script>
 <script type="text/javascript" src="pdp11/TextAreaView.js"></script>
-<script type="text/javascript" src="pdp11/BinData.js"></script>
-<script type="text/javascript" src="pdp11/Inode.js"></script>
-<script type="text/javascript" src="pdp11/File.js"></script>
-<script type="text/javascript" src="pdp11/Exe.js"></script>
-<script type="text/javascript" src="pdp11/ExeHeader.js"></script>
-
 <script type="text/javascript">
 
 var pdp11 ;
-var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin' ;
+//var __unixV6DiskImageURL = 'https://pdp11-js.googlecode.com/git/disk_image/v6bin' ;
+var __unixV6DiskImageURL = '../disk_image/v6bin' ;
 var __terminalView ;
 var __debugView ;
 var __debugOn ;
+var __debugCanvas ;
 var __figureWindow ;
 
 // TODO: maybe better to change the function name;
@@ -86,19 +80,10 @@ var initPdp11 = function( buffer ) {
 
   __terminalView.focus( ) ;
 
-  // 0xc6 : inode number of /rkunix  temporary work.
-  // TODO: make the boot loader.
-  var bin_data = object( BinData ).create( buffer ) ;
-  var inode = object( Inode ).create( 0xc6, bin_data ) ;
-  var file = object( File ).create( inode ) ;
-  var exe = object( Exe ).create( file ) ;
-
-  pdp11 = new Pdp11( __terminalView ) ;
-  pdp11.memory.storeBuffer( exe.buffer( ) ) ;
+  pdp11 = new Pdp11( __terminalView, __debugCanvas ) ;
   pdp11.disk.importBuffer( buffer ) ;
-  pdp11.setSymbols( exe.symbols( ) ) ;
   changeDebugFlags( ) ;
-  pdp11.loadBootRom( ) ;
+  pdp11.loadBootRom( buffer ) ;
   pdp11.run( ) ;
 } ;
 
@@ -116,6 +101,7 @@ var init = function( ) {
   __debugView = new LimitedLinesTextAreaView( 'debugView' ) ;
   document.getElementById( 'instructionCheck' ).disabled = true ;
   document.getElementById( 'kernelSymbolCheck' ).disabled = true ;
+  __debugCanvas = document.getElementById( 'debugCanvas' ) ;
   displayInitialMessage( ) ;
 } ;
 
@@ -123,7 +109,11 @@ var displayInitialMessage = function( ) {
   __terminalView.outputLine( 'Drag and drop your UNIX V6 disk image here or' ) ;
   __terminalView.outputLine( 'press the "load UNIX V6 Disk image" button to run UNIX V6.' ) ;
   __terminalView.outputLine( '' ) ;
-  __terminalView.outputLine( 'After that, enter "root" when "login: " is displayed.' ) ;
+  __terminalView.outputLine( 'Type "rkunix" slowly (\'cuz some reasons) when "@" is displayed.' ) ;
+  __terminalView.outputLine( 'And then, type "root" when "login: " is displayed.' ) ;
+  __terminalView.outputLine( '' ) ;
+  __terminalView.outputLine( 'Note that, use "#" instead of backspace.' ) ;
+  __terminalView.outputLine( 'And use "chdir" instead of "cd".' ) ;
   __terminalView.outputLine( '' ) ;
   __terminalView.outputLine( 'I confirmed only it runs on the combination of Windows and Chrome.' ) ;
   __terminalView.outputLine( '' ) ;
@@ -235,6 +225,7 @@ kernel symbol
 
 <p>
 <textarea id="debugView" cols="80" rows="20" readonly="readonly"> </textarea>
+<canvas id="debugCanvas" width="100" height="300" />
 </p>
 
 </span>

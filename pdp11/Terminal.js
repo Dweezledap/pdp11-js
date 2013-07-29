@@ -9,8 +9,8 @@ __jsimport( "pdp11/TextAreaView.js" ) ;
  *
  */
 function Terminal( pdp11, view ) {
-  this.rsr = new Register( ) ;
-  this.rbr = new Register( ) ;
+  this.rsr = new RegisterWithCallBack( this.writeRsrCallback.bind( this ) ) ;
+  this.rbr = new RegisterWithCallBack( null, this.readRbrCallback.bind( this ) ) ;
   this.xsr = new Register( ) ;
   this.xbr = new RegisterWithCallBack( this.checkXbr.bind( this ) ) ;
   this.xsr.writeBit( Terminal._XSR_DONE_BIT, true ) ;
@@ -21,7 +21,7 @@ function Terminal( pdp11, view ) {
   this.view.clear( ) ;
 }
 
-Terminal._INTERVAL = 200 ;
+Terminal._INTERVAL = 1 ;
 
 Terminal._RSR_BUSY_BIT = 11 ;
 Terminal._RSR_DONE_BIT = 7 ;
@@ -61,9 +61,25 @@ Terminal.prototype.checkXbr = function( ) {
   }
 } ;
 
+Terminal.prototype.writeRsrCallback = function( ) {
+  if( this.rsr.readBit( Terminal._RSR_READY_BIT, true ) ) {
+    this.rsr.writeBit( Terminal._RSR_READY_BIT, false, true ) ;
+    this.rsr.writeBit( Terminal._RSR_DONE_BIT, false, true ) ;
+  }
+} ;
+
+Terminal.prototype.readRbrCallback = function( ) {
+  if( this.rsr.readBit( Terminal._RSR_DONE_BIT, true ) ) {
+    this.rsr.writeBit( Terminal._RSR_READY_BIT, false, true ) ;
+    this.rsr.writeBit( Terminal._RSR_DONE_BIT, false, true ) ;
+  }
+} ;
+
 Terminal.prototype.input = function( ascii ) {
-  this.rbr.writeWord( ascii & 0x7f ) ;
-  if( this.rsr.readBit( Terminal._RSR_ENABLE_INTERRUPT_BIT ) ) {
+  this.rbr.writeWord( ascii & 0x7f, true ) ;
+  this.rsr.writeBit( Terminal._RSR_READY_BIT, true ) ;
+  this.rsr.writeBit( Terminal._RSR_DONE_BIT, true ) ;
+  if( this.rsr.readBit( Terminal._RSR_ENABLE_INTERRUPT_BIT, true ) ) {
     this.pdp11.interrupt( Terminal._INPUT_INTERRUPT_LEVEL, Terminal._INPUT_INTERRUPT_VECTOR ) ;
   }
 //  if( this.rsr.readBit( Terminal._RSR_READY_BIT ) ) {

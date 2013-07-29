@@ -13,11 +13,13 @@ __jsimport( "pdp11/Register.js" ) ;
 __jsimport( "pdp11/Util.js" ) ;
 __jsimport( "pdp11/Disassembler.js" ) ;
 __jsimport( "pdp11/SystemCall.js" ) ;
+__jsimport( "pdp11/DebugFigureView.js" ) ;
+
 
 /**
  *
  */
-function Pdp11( terminalView ) {
+function Pdp11( terminalView, figureCanvas ) {
   // may be better to move these lines to other class.
   this.memory = new Memory( ) ;
   this.psw = new Psw( ) ;
@@ -26,6 +28,7 @@ function Pdp11( terminalView ) {
   this.clock = new Clock( this ) ;
   this.terminal = new Terminal( this, terminalView ) ;
   this.disk = new Disk( this ) ;
+  this.debugFigureView = new DebugFigureView( this, figureCanvas ) ;
 
   this.mmu = new Mmu( this ) ;
   this.mmu.setApr( this.apr ) ;
@@ -91,7 +94,7 @@ Pdp11._BOOT_ROM_FOR_RK05 = [
   005007
 ] ;
 
-Pdp11._BOOT_DATA_ADDRESS = 0100000 ;
+Pdp11._BOOT_DATA_ADDRESS = 02000 ;
 
 /**
  *
@@ -100,11 +103,18 @@ Pdp11.prototype.setSymbols = function( symbols ) {
   this.symbols = symbols ;
 } ;
 
-Pdp11.prototype.loadBootRom = function( ) {
-  for( var i = 0; i < Pdp11._BOOT_ROM_FOR_RK05.length; i++ ) {
-    this.memory.storeWord( Pdp11._BOOT_DATA_ADDRESS + i, Pdp11._BOOT_ROM_FOR_RK05[ i ] ) ;
+Pdp11.prototype.loadBootRom = function( buffer ) {
+  // temporal
+  var uint8 = new Uint8Array( buffer ) ;
+  for( var i = 0; i < 512; i++ ) {
+    this.memory.storeByte( i, uint8[ i ] ) ;
   }
-  this._getPc( ).writeWord( Pdp11._BOOT_DATA_ADDRESS ) ;
+/*
+  for( var i = 0; i < Pdp11._BOOT_ROM_FOR_RK05.length; i++ ) {
+    this.memory.storeWord( Pdp11._BOOT_DATA_ADDRESS + i * 2, Pdp11._BOOT_ROM_FOR_RK05[ i ] ) ;
+  }
+  this._getPc( ).writeWord( Pdp11._BOOT_DATA_ADDRESS + 2 ) ;
+*/
 } ;
 
 /**
@@ -326,6 +336,7 @@ Pdp11.prototype.run = function( ) {
   var self = this ;
   var symbolName = null ;
   var runStep = function( ) {
+    self.debugFigureView.update( ) ;
     for( var count = 0; count < Pdp11._LOOP; count++ ) {
       if( self.stop ) {
         self._dumpLog( ) ;
@@ -333,8 +344,8 @@ Pdp11.prototype.run = function( ) {
       }
       try {
 
-//      if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
-//        __logger.log( self.dump( ) ) ;
+        if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
+          __logger.log( self.dump( ) ) ;
 
         self.clock.run( ) ;
         self.terminal.run( ) ;
@@ -474,7 +485,7 @@ Pdp11.prototype._asyncCall = function( func ) {
 
 // TODO: move to appropriate class.
 Pdp11.prototype._dumpLog = function( ) {
-  if( false && __logger.getUrl ) {
+  if( __logger.getUrl ) {
     var view = document.getElementById( 'traceLog' ) ;
     while( view.firstChild )
       view.removeChild( view.firstChild )
@@ -1370,7 +1381,9 @@ var OpCode = [
       pdp11._getPc( ).writeWord( addr ) ;
   } },
   { judge : 0177777, value : 0000240, op : 'nop',   type : OpType.I_OTHER },
-  { judge : 0177777, value : 0000000, op : 'halt',  type : OpType.I_OTHER },
+  { judge : 0177777, value : 0000000, op : 'halt',  type : OpType.I_OTHER,
+    run : function( pdp11, code, ahead ) {
+  } }, // not implemented yet.
   { judge : 0177777, value : 0000001, op : 'wait',  type : OpType.I_OTHER,
     run : function( pdp11, code, ahead ) {
       pdp11.wait = true ;

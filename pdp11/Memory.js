@@ -12,7 +12,7 @@ function Memory( ) {
   this.int16  = new Int16Array( buffer ) ;
 }
 
-Memory._CAPACITY = 1024 * 18 * 8 ; // 18KBytes
+Memory._CAPACITY = 01000000 ;
 
 /**
  * @param address
