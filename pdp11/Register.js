@@ -5,18 +5,21 @@
 /**
  * Register prototype
  *
- * This prototype provides Register emulation.
+ * This prototype provides a 16bit register emulation.
+ * This prototype is pretty simple.
+ * You can only write or read data into/from this.
+ *
  * @author Takahiro <hogehoge@gachapin.jp>
  */
 function Register( ) {
     var buffer = new ArrayBuffer( Register._wordSize ) ;
     this.uint8 = new Uint8Array( buffer ) ;
     this.uint16 = new Uint16Array( buffer ) ;
-    this.int16 = new Int16Array( buffer ) ;
     this.uint16[ 0 ] = 0 ;
 }
 
 Register._wordSize = 2 ; // 2bytes
+
 
 /**
  * Read word as unsigned 16bit integer.
@@ -26,6 +29,7 @@ Register.prototype.readWord = function( ) {
   return this.uint16[ 0 ] ;
 } ;
 
+
 /**
  * Read lower byte as unsigned 8bit integer.
  * @return the lower byte of register
@@ -34,6 +38,7 @@ Register.prototype.readLowByte = function( ) {
   return this.uint8[ 0 ] ;
 } ;
 
+
 /**
  * Read higher byte as unsigned 8bit integer.
  * @return the higher byte of register
@@ -41,6 +46,7 @@ Register.prototype.readLowByte = function( ) {
 Register.prototype.readHighByte = function( ) {
   return this.uint8[ 1 ] ;
 } ;
+
 
 /**
  * Partially read the data of register.
@@ -56,13 +62,16 @@ Register.prototype.readPartial = function( offset, mask ) {
   return this._readPartial( offset, mask ) ;
 } ;
 
+
 Register.prototype.readBit = function( bit ) {
   return this._readPartial( bit, 1 ) == 1 ? true : false ;
 } ;
 
+
 Register.prototype._readPartial = function( offset, mask ) {
   return ( this.uint16[ 0 ] >> offset ) & mask ;
 } ;
+
 
 /**
  * Write word.
@@ -72,6 +81,7 @@ Register.prototype.writeWord = function( value ) {
   this.uint16[ 0 ] = value ;
 } ;
 
+
 /**
  * Write lower byte. Higher byte will be unchanged.
  * @param written unsigned 8bit integer.
@@ -80,6 +90,7 @@ Register.prototype.writeLowByte = function( value ) {
   this.uint8[ 0 ] = value ;
 } ;
 
+
 /**
  * Write higher byte. Lower byte will be unchanged.
  * @param written unsigned 8bit integer.
@@ -87,6 +98,7 @@ Register.prototype.writeLowByte = function( value ) {
 Register.prototype.writeHighByte = function( value ) {
   this.uint8[ 1 ] = value ;
 } ;
+
 
 /**
  * Partially writte the data of register.
@@ -102,15 +114,18 @@ Register.prototype.writePartial = function( value, offset, mask ) {
   this._writePartial( value, offset, mask ) ;
 } ;
 
+
 Register.prototype.writeBit = function( bit, value ) {
   this._writePartial( value ? 1 : 0, bit, 1 ) ;
 } ;
+
 
 Register.prototype._writePartial = function( value, offset, mask ) {
   this.uint16[ 0 ] = ( ( this.readWord( )
                        & ( 0xffff & ~( mask << offset ) ) )
                        | ( value << offset ) ) ;
 } ;
+
 
 /**
  * Increment the value of refister by word size and then return the word.
@@ -123,6 +138,7 @@ Register.prototype.incrementWord = function( ) {
   return this.readWord( ) ;
 } ;
 
+
 /**
  * Increment the value of refister by byte size and then return the word.
  * This function is assumed to be called for CPU addressing mode.
@@ -134,6 +150,7 @@ Register.prototype.incrementByte = function( ) {
   return this.readWord( ) ;
 } ;
 
+
 /**
  * Decrement the value of refister by word size and then return the word.
  * This function is assumed to be called for CPU addressing mode.
@@ -144,6 +161,7 @@ Register.prototype.decrementWord = function( ) {
   this.uint16[ 0 ] -= 2 ;
   return this.readWord( ) ;
 } ;
+
 
 /**
  * Decrement the value of refister by byte size and then return the word.
@@ -158,8 +176,17 @@ Register.prototype.decrementByte = function( ) {
 
 
 
+
 __jsimport( "utility/Inherit.js" ) ;
 
+/**
+ * Some peripherals are driven by writing or reading a register
+ * which the peripheral has.
+ *
+ * This class is for such peripherals.
+ *
+ * @author Takahiro <hogehoge@gachapin.jp>
+ */
 function RegisterWithCallBack( writeCallback, readCallback ) {
   Register.call( this ) ;
   this.writeCallback = writeCallback ;
@@ -169,6 +196,10 @@ function RegisterWithCallBack( writeCallback, readCallback ) {
 RegisterWithCallBack.prototype = __inherit( Register.prototype ) ;
 RegisterWithCallBack.prototype.constructor = RegisterWithCallBack ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype._doWriteCallback = function( prevent ) {
   if( ! prevent && this.writeCallback )
     this.writeCallback( ) ;
