@@ -24,12 +24,14 @@ function Apr( ) {
 
 Apr._NUM_OF_APRS = 8 ;
 
+
 /**
  *
  */
 Apr.prototype.setPsw = function( psw ) {
   this.psw = psw ;
 } ;
+
 
 /**
  *
@@ -40,6 +42,7 @@ Apr.prototype.getPar = function( index ) {
            : this.userPars[ index ] ;
 } ;
 
+
 /**
  *
  */
@@ -48,6 +51,7 @@ Apr.prototype.getPdr = function( index ) {
            ? this.kernelPdrs[ index ]
            : this.userPdrs[ index ] ;
 } ;
+
 
 /**
  *

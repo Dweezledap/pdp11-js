@@ -1,6 +1,8 @@
 /**
  * Register Emulation Suites for JavaScript
+ * @author Takahiro <hogehoge@gachapin.jp>
  */
+
 
 /**
  * Register prototype
@@ -9,7 +11,7 @@
  * This prototype is pretty simple.
  * You can only write or read data into/from this.
  *
- * @author Takahiro <hogehoge@gachapin.jp>
+ * @constructor
  */
 function Register( ) {
     var buffer = new ArrayBuffer( Register._wordSize ) ;
@@ -23,7 +25,7 @@ Register._wordSize = 2 ; // 2bytes
 
 /**
  * Read word as unsigned 16bit integer.
- * @return the word of register
+ * @return the word data of register
  */
 Register.prototype.readWord = function( ) {
   return this.uint16[ 0 ] ;
@@ -32,7 +34,7 @@ Register.prototype.readWord = function( ) {
 
 /**
  * Read lower byte as unsigned 8bit integer.
- * @return the lower byte of register
+ * @return the lower byte data of register
  */
 Register.prototype.readLowByte = function( ) {
   return this.uint8[ 0 ] ;
@@ -41,7 +43,7 @@ Register.prototype.readLowByte = function( ) {
 
 /**
  * Read higher byte as unsigned 8bit integer.
- * @return the higher byte of register
+ * @return the higher byte data of register
  */
 Register.prototype.readHighByte = function( ) {
   return this.uint8[ 1 ] ;
@@ -49,7 +51,7 @@ Register.prototype.readHighByte = function( ) {
 
 
 /**
- * Partially read the data of register.
+ * Read the partial data of register.
  * For instance, if the data of register is 0001_0010_0011_0100b,
  * offset is 2(bits), and mask is 3(11b), the result is 01b.
  * If mask were width bit, this API would be more straight forward.
@@ -63,11 +65,26 @@ Register.prototype.readPartial = function( offset, mask ) {
 } ;
 
 
+/**
+ * Read a bit of register.
+ * @param bit 
+ * @return the higher byte data of register
+ */
 Register.prototype.readBit = function( bit ) {
   return this._readPartial( bit, 1 ) == 1 ? true : false ;
 } ;
 
 
+/**
+ * Read the partial data of register.
+ * For instance, if the data of register is 0001_0010_0011_0100b,
+ * offset is 2(bits), and mask is 3(11b), the result is 01b.
+ * If mask were width bit, this API would be more straight forward.
+ * But mask bit is easier to implement.
+ * @param offset bit offset from LSB.
+ * @param mask mask bit.
+ * @return 
+ */
 Register.prototype._readPartial = function( offset, mask ) {
   return ( this.uint16[ 0 ] >> offset ) & mask ;
 } ;
@@ -205,63 +222,106 @@ RegisterWithCallBack.prototype._doWriteCallback = function( prevent ) {
     this.writeCallback( ) ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype._doReadCallback = function( prevent ) {
   if( ! prevent && this.readCallback )
     this.readCallback( ) ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.readWord = function( prevent ) {
   var value = Register.prototype.readWord.call( this ) ;
   this._doReadCallback( prevent ) ;
   return value ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.readLowByte = function( prevent ) {
   var value = Register.prototype.readLowByte.call( this ) ;
   this._doReadCallback( prevent ) ;
   return value ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.readHighByte = function( prevent ) {
   var value = Register.prototype.readHighByte.call( this, value ) ;
   this._doReadCallback( prevent ) ;
   return value ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.readPartial = function( offset, mask, prevent ) {
   var value = Register.prototype.readPartial.call( this, offset, mask ) ;
   this._doReadCallback( prevent ) ;
   return value ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.readBit = function( bit, prevent ) {
   var value = Register.prototype.readBit.call( this, bit ) ;
   this._doReadCallback( prevent ) ;
   return value ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.writeWord = function( value, prevent ) {
   Register.prototype.writeWord.call( this, value ) ;
   this._doWriteCallback( prevent ) ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.writeLowByte = function( value, prevent ) {
   Register.prototype.writeLowByte.call( this, value ) ;
   this._doWriteCallback( prevent ) ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.writeHighByte = function( value, prevent ) {
   Register.prototype.writeHighByte.call( this, value ) ;
   this._doWriteCallback( prevent ) ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.writePartial = function( value, offset, mask, prevent ) {
   Register.prototype.writePartial.call( this, value, offset, mask ) ;
   this._doWriteCallback( prevent ) ;
 } ;
 
+
+/**
+ * @param prevent this function don't call callback function if it's true.
+ */
 RegisterWithCallBack.prototype.writeBit = function( bit, value, prevent ) {
   Register.prototype.writeBit.call( this, bit, value ) ;
   this._doWriteCallback( prevent ) ;
 } ;
-
