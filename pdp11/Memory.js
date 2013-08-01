@@ -10,7 +10,6 @@ function Memory( ) {
   var buffer = new ArrayBuffer( Memory._CAPACITY ) ;
   this.uint8  = new Uint8Array( buffer ) ;
   this.uint16 = new Uint16Array( buffer ) ;
-  this.int16  = new Int16Array( buffer ) ;
 }
 
 Memory._CAPACITY = 01000000 ;
@@ -55,9 +54,9 @@ Memory.prototype.storeByte = function( address, value ) {
 /**
  * @param buffer
  */
-Memory.prototype.storeBuffer = function( buffer ) {
+Memory.prototype.storeBuffer = function( offset, buffer ) {
   var array = new Uint8Array( buffer ) ;
   for( var i = 0; i < array.byteLength; i++ ) {
-    this.storeByte( i, array[ i ] ) ;
+    this.storeByte( i + offset, array[ i ] ) ;
   }
 } ;

@@ -4,6 +4,7 @@
 
 __jsimport( "pdp11/Register.js" ) ;
 
+
 /**
  *
  */
@@ -50,6 +51,10 @@ Disk._RKCS_ENABLE_INTERRUPT_BIT = 6 ;
 Disk._RKCS_COMMAND_BIT  = 1 ;
 Disk._RKCS_COMMAND_MASK = 0x7 ;
 
+
+/**
+ *
+ */
 Disk.prototype.run = function( ) {
 
   if( ! this.busy )
@@ -77,8 +82,13 @@ Disk.prototype.run = function( ) {
     }
     this.step = 0 ;
   }
+
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype.check = function( ) {
   if( this._go( ) ) {
     this.step = 0 ;
@@ -86,14 +96,26 @@ Disk.prototype.check = function( ) {
   }
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._getCommand = function( ) {
   return this.rkcs.readPartial( Disk._RKCS_COMMAND_BIT, Disk._RKCS_COMMAND_MASK, true ) ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._go = function( ) {
   return this.rkcs.readWord( true ) & 1 ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._calculateDiskAddress = function( ) {
   var driveNum = this.rkda.readPartial( Disk._RKDA_DRIVE_BIT, Disk._RKDA_DRIVE_MASK ) ;
   var cylinderNum = this.rkda.readPartial( Disk._RKDA_CYLINDER_BIT, Disk._RKDA_CYLINDER_MASK ) ;
@@ -103,15 +125,27 @@ Disk.prototype._calculateDiskAddress = function( ) {
   return ( driveNum * 4800 + cylinderNum * 24 + side * 12 + sectorNum ) * 512 ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._calculateMemoryAddress = function( ) {
   // temporal
   return ( this.rkcs.readPartial( 4, 0x3 ) << 16 ) | this.rkba.readWord( ) ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._getWordCount = function( ) {
   return to_int16( this.rkwc.readWord( ) * -1 ) ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._runLoad = function( ) {
   __logger.log( this._dump( ) ) ;
   for( var i = 0; i < this._getWordCount( ); i++ ) {
@@ -124,6 +158,10 @@ Disk.prototype._runLoad = function( ) {
   }
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._runStore = function( ) {
   __logger.log( this._dump( ) ) ;
   for( var i = 0; i < this._getWordCount( ); i++ ) {
@@ -136,6 +174,10 @@ Disk.prototype._runStore = function( ) {
   }
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype.importBuffer = function( buffer ) {
   var array = new Uint16Array( buffer ) ;
   for( var i = 0; i < array.length; i++ ) {
@@ -144,6 +186,10 @@ Disk.prototype.importBuffer = function( buffer ) {
   this.length = array.length ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype.exportBuffer = function( ) {
   var array = new Uint16Array( this.length ) ;
   for( var i = 0; i < this.length; i++ ) {
@@ -152,14 +198,26 @@ Disk.prototype.exportBuffer = function( ) {
   return array.buffer ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._loadWord = function( address ) {
   return this.uint16[ address >> 1 ] ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._storeWord = function( address, value ) {
   this.uint16[ address >> 1 ] = value ;
 } ;
 
+
+/**
+ *
+ */
 Disk.prototype._dump = function( ) {
   buffer = '' ;
   buffer +=   "rkds:" + format( this.rkds.readWord( ) ) ;
@@ -172,5 +230,4 @@ Disk.prototype._dump = function( ) {
          +  "(" + format( this._calculateDiskAddress( ) / 512 )+ ")" ;
   buffer += ", rkdb:" + format( this.rkdb.readWord( ) ) ;
   return buffer ;
-}
-
+} ;

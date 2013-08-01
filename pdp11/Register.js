@@ -1,6 +1,7 @@
 /**
  * Register Emulation Suites for JavaScript
  * @author Takahiro <hogehoge@gachapin.jp>
+ * TODO: Bad design
  */
 
 

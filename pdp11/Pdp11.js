@@ -103,62 +103,19 @@ Pdp11.prototype.run = function( ) {
   var runStep = function( ) {
     self.debugFigureView.update( ) ;
     for( var count = 0; count < Pdp11._LOOP; count++ ) {
+
       if( self.stop ) {
         self._dumpLog( ) ;
         return ;
       }
+
       try {
 
         if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
           __logger.log( self.dump( ) ) ;
 
-        self.clock.run( ) ;
-        self.terminal.run( ) ;
-        self.disk.run( ) ;
-
-        if( self.psw.getTrap( ) ) {
-          if( self.debugFlags[ 'trap' ] ) {
-            __debugView.outputLine( "trap occured. " + format( self.trap_vector ) ) ;
-          }
-//          console.log( "trap occured. " + format( self.trap_vector ) ) ;
-          self.psw.setTrap( false ) ;
-          var tmp_psw = self.psw.readWord( ) ;
-          var tmp_pc = self._getPc( ).readWord( ) ;
-          var tmp_mode = self.psw.getCurrentMode( ) ;
-
-          self.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
-          self._pushStack( tmp_psw ) ;
-          self._pushStack( tmp_pc ) ;
-
-          self._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector ) ) ;
-          self.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector + 2 ) ) ;
-          self.psw.setPreviousMode( tmp_mode ) ;
-
-          self.trap_vector = 0 ;
-//        __logger.log( self.dump( ) ) ;
-        } else if( self._checkInterrupt( ) ) {
-          if( self.debugFlags[ 'interrupt' ] ) {
-            __debugView.outputLine( "interrupt occured. " + format( self.interrupt_vector ) ) ;
-          }
-//        console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
-          var tmp_psw = self.psw.readWord( ) ;
-          var tmp_pc = self._getPc( ).readWord( ) ;
-          var tmp_mode = self.psw.getCurrentMode( ) ;
-
-          self.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
-
-          self._pushStack( tmp_psw ) ;
-          self._pushStack( tmp_pc ) ;
-
-          self._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.interrupt_vector ) ) ;
-          self.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.interrupt_vector + 2 ) ) ;
-          self.psw.setPreviousMode( tmp_mode ) ;
-
-          self.interrupt_vector = 0 ;
-          self.interrupt_level = 0 ;
-          self.wait = false ;
-//        __logger.log( self.dump( ) ) ;
-        }
+        self._runPeripherals( ) ;
+        self._handleTrapAndInterrupt( ) ;
 
         if( self.wait ) {
           continue ;
@@ -168,38 +125,34 @@ Pdp11.prototype.run = function( ) {
         var code = self._fetch( ) ;
         var op = self._decode( code ) ;
 
-        if( __logger.level != Logger.NONE_LEVEL ) {
-          __logger.log( 'pc:' + self._getPc( ).readWord( ) + ' cur_mode:' + self.psw.getCurrentMode( ) ) ;
-          __logger.log( self.disassembler.run( op, code ) ) ;
-        }
-
-        if( self.debugFlags[ 'instruction' ] ) {
-          __debugView.outputLine( op.op ) ;
-        }
+        if( self.debugFlags[ 'instruction' ] )
+          __debugView.outputLine( self.disassembler.run( op, code ) ) ;
 
         op.run( self, code ) ;
 
         if( self.debugFlags[ 'systemCall' ] && op && op.op == 'trap' ) {
           var buffer = 'systemcall ' + SystemCall[ code & 0xff ].name ;
+          // if indirect call
           if( ( code & 0xff ) == 0 ) {
-            var tmp = self.mmu.loadWord( self._getPc( ).readWord( ) ) ;
-            var sys_op = self.mmu.loadWord( tmp ) ;
-            buffer += '(' + SystemCall[ sys_op & 0xff ].name + ')' ;
+            var sysOp = self.mmu.loadWord( self.mmu.loadWord( self._getPc( ).readWord( ) ) ) ;
+            buffer += '(' + SystemCall[ sysOp & 0xff ].name + ')' ;
           }
           __debugView.outputLine( buffer ) ;
         }
+
       } catch( e ) {
+
         // temporal
         if( e.name == 'RangeError' ) {
           self.trap( 0250 ) ;
         } else {
-          console.log( format( code ) + ':' + op.op ) ;
-          console.log( e.stack ) ;
           __logger.log( e.stack ) ;
           self._dumpLog( ) ;
           throw e ;
         }
+
       }
+
     }
     self._asyncCall( runStep ) ;
   } ;
@@ -208,55 +161,55 @@ Pdp11.prototype.run = function( ) {
 
 
 /**
- * TODO: implement.
+ *
+ */
+Pdp11.prototype._runPeripherals = function( ) {
+  this.clock.run( ) ;
+  this.terminal.run( ) ;
+  this.disk.run( ) ;
+} ;
+
+
+/**
+ *
  */
 Pdp11.prototype._handleTrapAndInterrupt = function( ) {
 
   if( this.psw.getTrap( ) ) {
-    if( this.debugFlags[ 'trap' ] ) {
+    if( this.debugFlags[ 'trap' ] )
       __debugView.outputLine( "trap occured. " + format( this.trap_vector ) ) ;
-    }
-//    console.log( "trap occured. " + format( this.trap_vector ) ) ;
     this.psw.setTrap( false ) ;
-
-    var tmp_psw = this.psw.readWord( ) ;
-    var tmp_pc = this._getPc( ).readWord( ) ;
-    var tmp_mode = this.psw.getCurrentMode( ) ;
-
-    this.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
-    this._pushStack( tmp_psw ) ;
-    this._pushStack( tmp_pc ) ;
-
-    this._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector ) ) ;
-    this.psw.writeWord( self.mmu.loadWordByPhysicalAddress( self.trap_vector + 2 ) ) ;
-    this.psw.setPreviousMode( tmp_mode ) ;
-
+    this._switchCurrentMode( this.trap_vector ) ;
     this.trap_vector = 0 ;
 //  __logger.log( this.dump( ) ) ;
   } else if( this._checkInterrupt( ) ) {
-    if( this.debugFlags[ 'interrupt' ] ) {
+    if( this.debugFlags[ 'interrupt' ] )
       __debugView.outputLine( "interrupt occured. " + format( this.interrupt_vector ) ) ;
-    }
-//    console.log( "interrupt occured. " + format( self.interrupt_vector ) ) ;
-
-    var tmp_psw = this.psw.readWord( ) ;
-    var tmp_pc = this._getPc( ).readWord( ) ;
-    var tmp_mode = this.psw.getCurrentMode( ) ;
-
-    this.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
-    this._pushStack( tmp_psw ) ;
-    this._pushStack( tmp_pc ) ;
-
-    this._getPc( ).writeWord( self.mmu.loadWordByPhysicalAddress( this.interrupt_vector ) ) ;
-    this.psw.writeWord( self.mmu.loadWordByPhysicalAddress( this.interrupt_vector + 2 ) ) ;
-    this.psw.setPreviousMode( tmp_mode ) ;
-
+    this._switchCurrentMode( this.interrupt_vector ) ;
     this.interrupt_vector = 0 ;
     this.interrupt_level = 0 ;
     this.wait = false ;
 //    __logger.log( this.dump( ) ) ;
   }
 
+} ;
+
+
+/**
+ *
+ */
+Pdp11.prototype._switchCurrentMode = function( vector ) {
+  var tmpPsw = this.psw.readWord( ) ;
+  var tmpPc = this._getPc( ).readWord( ) ;
+  var tmpMode = this.psw.getCurrentMode( ) ;
+
+  this.psw.setCurrentMode( Psw.KERNEL_MODE ) ;
+  this._pushStack( tmpPsw ) ;
+  this._pushStack( tmpPc ) ;
+
+  this._getPc( ).writeWord( this.mmu.loadWordByPhysicalAddress( vector ) ) ;
+  this.psw.writeWord( this.mmu.loadWordByPhysicalAddress( vector + 2 ) ) ;
+  this.psw.setPreviousMode( tmpMode ) ;
 } ;
 
 
@@ -489,12 +442,16 @@ Pdp11.prototype._decode = function( code ) {
     }
   }
 
+  // TODO: optimize
   for( var i = 0; i < OpCode.length; i++ ) {
     if( ( code & OpCode[ i ].judge ) == OpCode[ i ].value ) {
       return OpCode[ i ] ;
     }
   }
+
+  // TODO: should throw exception?
   return null ;
+
 } ;
 
 
@@ -819,7 +776,7 @@ Pdp11.prototype.interrupt = function( level, vector ) {
 
 
 /**
- *
+ * TODO: optimize
  */
 Pdp11.prototype._checkInterrupt = function( ) {
   for( var i = 7; i >= 0; i-- ) {
@@ -837,9 +794,8 @@ Pdp11.prototype._checkInterrupt = function( ) {
 
 
 /**
- *
+ * TODO: optimize
  */
-// not implemented yet.
 Pdp11.prototype.trap = function( vector ) {
   this.trap_vector = vector ;
   this.psw.setTrap( true ) ;
@@ -864,7 +820,7 @@ var OpType = {
 
 
 /**
- *
+ * TODO: optimize
  */
 var DoubleOperandInstructions = {
   'mov' :
@@ -949,6 +905,9 @@ var DoubleOperandInstructions = {
   } }
 } ;
 
+/**
+ * TODO: optimize
+ */
 var OneHalfOperandInstructions = {
   // TODO: confirm
   'mul' :
@@ -1084,7 +1043,7 @@ var OneHalfOperandInstructions = {
 
 
 /**
- *
+ * TODO: optimize
  */
 var SingleOperandInstructions = {
   'swab' :
@@ -1296,6 +1255,10 @@ var SingleOperandInstructions = {
   { judge : 0177700, value : 0106700, op : 'mfps',  type : OpType.I_SINGLE }
 } ;
 
+
+/**
+ * TODO: optimize
+ */
 var BranchInstructions = {
   'br' :
   { judge : 0177400, value : 0000400, op : 'br',    type : OpType.I_BRANCH,
@@ -1390,7 +1353,7 @@ var BranchInstructions = {
 
 
 /**
- *
+ * TODO: optimize
  */
 var OpCode = [
 
@@ -1499,7 +1462,7 @@ var OpCode = [
 
 
 /**
- *
+ * TODO: optimize
  */
 var OpHandler = {
 
