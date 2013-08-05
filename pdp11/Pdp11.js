@@ -56,6 +56,8 @@ function Pdp11( terminalView, figureCanvas ) {
   this.stop = false ;
   this.break = false ;
   this.prePc = 0 ;
+  this.op = null ;
+  this.code = null ;
 
   this.debugFlags = {
     'instruction' : false,
@@ -126,11 +128,6 @@ Pdp11.prototype.runStep = function( step ) {
 
     try {
 
-      if( this.breakPoints.indexOf( this._getPc( ).readWord( ) ) >= 0 ) {
-        this.break = true ;
-        __debugView.outputLine( 'break point at ' + format( this._getPc( ).readWord( ) ) ) ;
-      }
-
       if( ! this.wait && __logger.level != Logger.NONE_LEVEL )
         __logger.log( this.dump( ) ) ;
 
@@ -141,53 +138,88 @@ Pdp11.prototype.runStep = function( step ) {
         continue ;
       }
 
-      this.prePc = this._getPc( ).readWord( ) ;
-      var code = this._fetch( ) ;
-      var op = this._decode( code ) ;
+      if( this.breakPoints.indexOf( this._getPc( ).readWord( ) ) >= 0 ) {
+        this.break = true ;
+        __debugView.outputLine( 'break point at ' + format( this._getPc( ).readWord( ) ) ) ;
+      }
 
       if( this.break ) {
         __pdp11View.clear( ) ;
         __pdp11View.outputLine( this.dump( ) ) ;
         __stackView.clear( ) ;
         __stackView.outputLine( this.stackDump( ) ) ;
+
+        // TODO: bad logic
+        var code = this._fetch( ) ;
+        var op = this._decode( code ) ;
+        this._getPc( ).decrementWord( ) ;
         __debugView.outputLine( this.disassembler.run( op, code ) ) ;
+
+        stopAtBreakPoint( ) ;
+        return ;
       }
 
-      // TODO:
-      // when this.break is true, I wanna return from here.
-      // And I wanna resume from here when "next step" is clicked.
+      this._executeInstruction( ) ;
 
-      op.run( this, code ) ;
-
-      if( this.debugFlags[ 'systemCall' ] && op && op.op == 'trap' ) {
-        var buffer = 'systemcall ' + SystemCall[ code & 0xff ].name ;
-        // if indirect call
-        if( ( code & 0xff ) == 0 ) {
-          var sysOp = this.mmu.loadWord( this.mmu.loadWord( this._getPc( ).readWord( ) ) ) ;
-          buffer += '(' + SystemCall[ sysOp & 0xff ].name + ')' ;
-        }
-        __debugView.outputLine( buffer ) ;
-      }
-
+    // TODO: duplicated logic
     } catch( e ) {
-
-      // temporal
-      if( e.name == 'RangeError' ) {
-        this.trap( 0250 ) ;
-      } else {
-        __logger.log( e.stack ) ;
-        this._dumpLog( ) ;
-        throw e ;
-      }
-
-    }
-
-    if( this.break ) {
-      stopAtBreakPoint( ) ;
-      return ;
+      this._catchException( e ) ;
     }
 
   }
+} ;
+
+
+/**
+ *
+ */
+Pdp11.prototype._executeInstruction = function( ) {
+
+  this.prePc = this._getPc( ).readWord( ) ;
+  var code = this._fetch( ) ;
+  var op = this._decode( code ) ;
+
+  op.run( this, code ) ;
+
+  if( this.debugFlags[ 'systemCall' ] && op && op.op == 'trap' ) {
+    var buffer = 'systemcall ' + SystemCall[ code & 0xff ].name ;
+    // if indirect call
+    if( ( code & 0xff ) == 0 ) {
+      var sysOp = this.mmu.loadWord( this.mmu.loadWord( this._getPc( ).readWord( ) ) ) ;
+      buffer += '(' + SystemCall[ sysOp & 0xff ].name + ')' ;
+    }
+    __debugView.outputLine( buffer ) ;
+  }
+
+} ;
+
+
+/**
+ *
+ */
+Pdp11.prototype._catchException = function( e ) {
+  // temporal
+  if( e.name == 'RangeError' ) {
+    this.trap( 0250 ) ;
+  } else {
+    __logger.log( e.stack ) ;
+    this._dumpLog( ) ;
+    throw e ;
+  }
+} ;
+
+
+/**
+ * TODO: duplicated code.
+ */
+Pdp11.prototype.resume = function( ) {
+  try {
+    this._executeInstruction( ) ;
+  // TODO: duplicated code.
+  } catch( e ) {
+    this._catchException( e ) ;
+  }
+  this.run( ) ;
 } ;
 
 

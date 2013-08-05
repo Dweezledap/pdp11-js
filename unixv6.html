@@ -128,6 +128,8 @@ var init = function( ) {
   document.getElementById( 'stopButton' ).disabled = true ;
   document.getElementById( 'nextStepButton' ).disabled = true ;
   document.getElementById( 'continueButton' ).disabled = true ;
+  document.getElementById( 'virtualAddressButton' ).disabled = true ;
+  document.getElementById( 'physicalAddressButton' ).disabled = true ;
   __debugCanvas = document.getElementById( 'debugCanvas' ) ;
   displayInitialMessage( ) ;
 } ;
@@ -238,6 +240,8 @@ var stopAtBreakPoint = function( ) {
   document.getElementById( 'stopButton' ).disabled = true ;
   document.getElementById( 'nextStepButton' ).disabled = false ;
   document.getElementById( 'continueButton' ).disabled = false ;
+  document.getElementById( 'virtualAddressButton' ).disabled = false ;
+  document.getElementById( 'physicalAddressButton' ).disabled = false ;
 } ;
 
 
@@ -248,10 +252,9 @@ var nextStep = function( ) {
   document.getElementById( 'stopButton' ).disabled = false ;
   document.getElementById( 'nextStepButton' ).disabled = true ;
   document.getElementById( 'continueButton' ).disabled = true ;
-  if( __pdp11.wait )
-    __pdp11.run( ) ;
-  else
-    __pdp11.runStep( 1 ) ;
+  document.getElementById( 'virtualAddressButton' ).disabled = true ;
+  document.getElementById( 'physicalAddressButton' ).disabled = true ;
+  __pdp11.resume( ) ;
 } ;
 
 
@@ -262,8 +265,10 @@ var continueStep = function( ) {
   document.getElementById( 'stopButton' ).disabled = false ;
   document.getElementById( 'nextStepButton' ).disabled = true ;
   document.getElementById( 'continueButton' ).disabled = true ;
+  document.getElementById( 'virtualAddressButton' ).disabled = true ;
+  document.getElementById( 'physicalAddressButton' ).disabled = true ;
   __pdp11.break = false ;
-  __pdp11.run(  ) ;
+  __pdp11.resume( ) ;
 } ;
 
 
@@ -299,6 +304,34 @@ var showDebugger = function( ) {
     span.style.cssText = '' ;
   } ;
 } ;
+
+
+/**
+ * TODO: duplicated codes.
+ */
+var loadVirtualAddress = function( ) {
+  var address = Number( document.getElementById( 'memoryAddressInput' ).value ) ;
+  if( isNaN( address ) )
+    return ;
+  var buffer = 'v_address:' + format( address ) + ' ' +
+               'p_address:' + format( __pdp11.mmu._convert( address, true ), 5 ) + ' ' +
+               'value:'     + format( __pdp11.mmu.loadWord( address, true ) ) ;
+  __debugView.outputLine( buffer ) ;
+} ;
+
+
+/**
+ * TODO: duplicated codes.
+ */
+var loadPhysicalAddress = function( ) {
+  var address = Number( document.getElementById( 'memoryAddressInput' ).value ) ;
+  if( isNaN( address ) )
+    return ;
+  var buffer = 'p_address:' + format( address ) + ' ' +
+               'value:'     + format( __pdp11.mmu.loadWordByPhysicalAddress( address ), 5 ) ;
+  __debugView.outputLine( buffer ) ;
+} ;
+
 
 /**
  * 
@@ -373,7 +406,7 @@ trap
 interrupt
 <input type="checkbox" id="interruptCheck" onclick="changeDebugFlags( )" />
 system call
-<input type="checkbox" id="systemCallCheck" onclick="changeDebugFlags( )" checked/>
+<input type="checkbox" id="systemCallCheck" onclick="changeDebugFlags( )" />
 kernel symbol
 <input type="checkbox" id="kernelSymbolCheck" onclick="changeDebugFlags( )" />
 </p>
@@ -391,6 +424,9 @@ break points
 <button id="stopButton" onclick="stopPdp11( )">stop</button>
 <button id="nextStepButton" onclick="nextStep( )">next step</button>
 <button id="continueButton" onclick="continueStep( )">continue</button>
+<input type="text" size="10" id="memoryAddressInput" />
+<button id="virtualAddressButton" onclick="loadVirtualAddress( )">virtual address</button>
+<button id="physicalAddressButton" onclick="loadPhysicalAddress( )">physical address</button>
 </p>
 
 <p>

@@ -6,8 +6,8 @@
 /**
  *
  */
-function format( num ) {
-  return sprintf( __num_format, num, __num_digit ) ;
+function format( num, digit ) {
+  return sprintf( __num_format, num, digit ? digit : __num_digit ) ;
 }
 
 
