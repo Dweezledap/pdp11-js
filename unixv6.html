@@ -289,6 +289,18 @@ var displayInitialMessage = function( ) {
 
 
 /**
+ *
+ */
+var showDebugger = function( ) {
+  var span = document.getElementById( 'debuggerSpan' ) ;
+  if( span.style.cssText == '' ) {
+    span.style.cssText = 'display: none' ;
+  } else {
+    span.style.cssText = '' ;
+  } ;
+} ;
+
+/**
  * 
  */
 var flushLog = function( ) {
@@ -348,10 +360,11 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 </p>
 
 <p>
-for debug (under construction)
+show debugger (under construction)
+<input type="checkbox" id="showDebuggerCheck" onchange="showDebugger( )" />
 </p>
 
-<span id="debugSpan">
+<span id="debuggerSpan" style="display: none">
 <p>
 instruction
 <input type="checkbox" id="instructionCheck" onclick="changeDebugFlags( )" />
