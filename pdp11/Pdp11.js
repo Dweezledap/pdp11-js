@@ -54,6 +54,7 @@ function Pdp11( terminalView, figureCanvas ) {
   this.trap_vector = 0 ;
   this.wait = false ;
   this.stop = false ;
+  this.break = false ;
   this.prePc = 0 ;
 
   this.debugFlags = {
@@ -65,6 +66,7 @@ function Pdp11( terminalView, figureCanvas ) {
   } ;
 
   this.disassembler = new Disassembler( this ) ;
+  this.breakPoints = [ ] ;
 }
 
 Pdp11._NUM_OF_REGISTERS = 8 ;
@@ -98,65 +100,94 @@ Pdp11._BOOT_DATA_ADDRESS = 02000 ;
  *
  */
 Pdp11.prototype.run = function( ) {
-
   var self = this ;
   var runStep = function( ) {
-    self.debugFigureView.update( ) ;
-    for( var count = 0; count < Pdp11._LOOP; count++ ) {
+    self.runStep( ) ;
+    if( ! self.break || self.wait )
+      self._asyncCall( runStep ) ;
+  } ;
+  runStep( ) ;
+} ;
 
-      if( self.stop ) {
-        self._dumpLog( ) ;
-        return ;
+
+/**
+ *
+ */
+Pdp11.prototype.runStep = function( step ) {
+  if( step == undefined )
+    step = Pdp11._LOOP ;
+  this.debugFigureView.update( ) ;
+  for( var count = 0; count < step; count++ ) {
+
+    if( this.stop ) {
+      this._dumpLog( ) ;
+      return ;
+    }
+
+    try {
+
+      if( this.breakPoints.indexOf( this._getPc( ).readWord( ) ) >= 0 ) {
+        this.break = true ;
+        __debugView.outputLine( 'break point at ' + format( this._getPc( ).readWord( ) ) ) ;
       }
 
-      try {
+      if( ! this.wait && __logger.level != Logger.NONE_LEVEL )
+        __logger.log( this.dump( ) ) ;
 
-        if( ! self.wait && __logger.level != Logger.NONE_LEVEL )
-          __logger.log( self.dump( ) ) ;
+      this._runPeripherals( ) ;
+      this._handleTrapAndInterrupt( ) ;
 
-        self._runPeripherals( ) ;
-        self._handleTrapAndInterrupt( ) ;
+      if( this.wait ) {
+        continue ;
+      }
 
-        if( self.wait ) {
-          continue ;
+      this.prePc = this._getPc( ).readWord( ) ;
+      var code = this._fetch( ) ;
+      var op = this._decode( code ) ;
+
+      if( this.break ) {
+        __pdp11View.clear( ) ;
+        __pdp11View.outputLine( this.dump( ) ) ;
+        __stackView.clear( ) ;
+        __stackView.outputLine( this.stackDump( ) ) ;
+        __debugView.outputLine( this.disassembler.run( op, code ) ) ;
+      }
+
+      // TODO:
+      // when this.break is true, I wanna return from here.
+      // And I wanna resume from here when "next step" is clicked.
+
+      op.run( this, code ) ;
+
+      if( this.debugFlags[ 'systemCall' ] && op && op.op == 'trap' ) {
+        var buffer = 'systemcall ' + SystemCall[ code & 0xff ].name ;
+        // if indirect call
+        if( ( code & 0xff ) == 0 ) {
+          var sysOp = this.mmu.loadWord( this.mmu.loadWord( this._getPc( ).readWord( ) ) ) ;
+          buffer += '(' + SystemCall[ sysOp & 0xff ].name + ')' ;
         }
+        __debugView.outputLine( buffer ) ;
+      }
 
-        self.prePc = self._getPc( ).readWord( ) ;
-        var code = self._fetch( ) ;
-        var op = self._decode( code ) ;
+    } catch( e ) {
 
-        if( self.debugFlags[ 'instruction' ] )
-          __debugView.outputLine( self.disassembler.run( op, code ) ) ;
-
-        op.run( self, code ) ;
-
-        if( self.debugFlags[ 'systemCall' ] && op && op.op == 'trap' ) {
-          var buffer = 'systemcall ' + SystemCall[ code & 0xff ].name ;
-          // if indirect call
-          if( ( code & 0xff ) == 0 ) {
-            var sysOp = self.mmu.loadWord( self.mmu.loadWord( self._getPc( ).readWord( ) ) ) ;
-            buffer += '(' + SystemCall[ sysOp & 0xff ].name + ')' ;
-          }
-          __debugView.outputLine( buffer ) ;
-        }
-
-      } catch( e ) {
-
-        // temporal
-        if( e.name == 'RangeError' ) {
-          self.trap( 0250 ) ;
-        } else {
-          __logger.log( e.stack ) ;
-          self._dumpLog( ) ;
-          throw e ;
-        }
-
+      // temporal
+      if( e.name == 'RangeError' ) {
+        this.trap( 0250 ) ;
+      } else {
+        __logger.log( e.stack ) ;
+        this._dumpLog( ) ;
+        throw e ;
       }
 
     }
-    self._asyncCall( runStep ) ;
-  } ;
-  runStep( ) ;
+
+    if( this.break ) {
+      stopAtBreakPoint( ) ;
+      return ;
+    }
+
+  }
 } ;
 
 
@@ -227,6 +258,14 @@ Pdp11.prototype.loadBootRom = function( buffer ) {
   }
   this._getPc( ).writeWord( Pdp11._BOOT_DATA_ADDRESS + 2 ) ;
 */
+} ;
+
+
+/**
+ *
+ */
+Pdp11.prototype.setBreakPoints = function( breakPoints ) {
+  this.breakPoints = breakPoints ;
 } ;
 
 
@@ -1717,10 +1756,25 @@ Pdp11.prototype.dump = function( ) {
   buffer += ' ' ;
   for( var i = 0; i < Pdp11._NUM_OF_REGISTERS; i++ ) {
     buffer += 'r' + i + ':' + format( this._getReg( i ).readWord( ) ) ;
-    buffer += '(' + format( this.mmu.loadWord( this._getReg( i ).readWord( ) ) ) + ')' ;
+    buffer += '(' + format( this.mmu.loadWord( this._getReg( i ).readWord( ), true ) ) + ')' ;
     buffer += ', ' ;
   }
   buffer += this.mmu.dump( ) ;
   buffer += this.apr.dump( ) ;
+  return buffer ;
+} ;
+
+
+/**
+ *
+ */
+Pdp11.prototype.stackDump = function( ) {
+  buffer = '' ;
+  for( var i = 0; i < 10; i++ ) {
+    if( this._getSp( ).readWord( ) + ( i * 2 ) >= 0x10000 )
+      return buffer ;
+    buffer += format( this._getSp( ).readWord( ) + ( i * 2 ) ) + ':' +
+              format( this.mmu.loadWord( this._getSp( ).readWord( ) + ( i * 2 ), true ) ) + '\n' ;
+  }
   return buffer ;
 } ;

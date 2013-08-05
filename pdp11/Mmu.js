@@ -127,8 +127,8 @@ Mmu.prototype._map = function( address ) {
 
 } ;
 
-Mmu.prototype.loadWord = function( v_address ) {
-  var p_address = this._convert( v_address ) ;
+Mmu.prototype.loadWord = function( v_address, prevent ) {
+  var p_address = this._convert( v_address, prevent ) ;
   return this.loadWordByPhysicalAddress( p_address ) ;
 } ;
 
@@ -179,7 +179,7 @@ Mmu.prototype._managementIsAvailable = function( ) {
 /**
  * TODO: throw exception when invalid access happens.
  */
-Mmu.prototype._convert = function( v_address ) {
+Mmu.prototype._convert = function( v_address, prevent ) {
   v_address &= 0xffff ;
   if( ! this._managementIsAvailable( ) ) {
     if( v_address >= 0160000 && v_address < 0180000 ) {
@@ -193,6 +193,8 @@ Mmu.prototype._convert = function( v_address ) {
   var offset = v_address & 0x1fff ;
   var blockNum = offset >> 6
   var p_address = base + offset;
+  if( prevent )
+    return p_address ;
 
   var length = this.apr.getPdr( index ).readPartial( 8, 0x7f ) ;
   var ed = this.apr.getPdr( index ).readBit( 3 ) ;
