@@ -174,6 +174,30 @@ var inputTerminal = function( e ) {
 /**
  *
  */
+var inputTerminalForAndroid = function( ) {
+  var input = document.getElementById( 'androidInput' ) ;
+  if( __pdp11 ) {
+    input.setAttribute( 'readonly', true ) ;
+    var str = input.value + '\n' ;
+    var i = 0 ;
+    var func = function( ) {
+      __pdp11.terminal.input( str.charCodeAt( i ) ) ;
+      input.value = input.value.slice( 1, input.value.length ) ;
+      i++ ;
+      if( i < str.length )
+        setTimeout( func, 5 ) ;
+      else
+        input.removeAttribute( 'readonly' ) ;
+    } ;
+    func( ) ;
+  } else {
+    input.value = '' ;
+  }
+} ;
+
+/**
+ *
+ */
 var updateBreakPoints = function( value ) {
   var select = document.getElementById( 'breakPointsSelect' ) ;
   while( select.firstChild )
@@ -390,6 +414,11 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 
 <p>
 <textarea id="terminalView" cols="80" rows="20" readonly="readonly" onkeypress="inputTerminal( event )"> </textarea>
+</p>
+
+<p>
+<input type="text" id="androidInput" size="30" onchange="inputTerminalForAndroid( )" />
+Input area for Android
 </p>
 
 <p>
