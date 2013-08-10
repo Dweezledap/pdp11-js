@@ -159,11 +159,47 @@ var changeDebugFlags = function( ) {
 /**
  *
  */
-var inputTerminal = function( e ) {
+var inputTerminalByKeypress = function( e ) {
+  if( e.ctrlKey )
+    return ;
   var keyCode = e.keyCode ;
-
   if( keyCode >= 0x41 && keyCode <= 0x5a && ! e.shiftKey ) {
     keyCode += 0x20 ;
+  }
+  if( __pdp11 )
+    __pdp11.terminal.input( keyCode ) ;
+  e.preventDefault( ) ;
+} ;
+
+
+/**
+ * handle special characters.
+ * TODO: combine to inputeTerminalByKeypress?
+ */
+var inputTerminalByKeydown = function( e ) {
+  var keyCode = e.keyCode ;
+  if( e.ctrlKey ) {
+    switch( keyCode ) {
+      case 0x44: // d
+        keyCode = 4 ;
+        break ;
+      default:
+        return ;
+    }
+  } else {
+    switch( keyCode ) {
+      case 0x8:  // backspace
+      case 0x9:  // tab
+        break ;
+      case 0x13: // pause
+        keyCode = 034 ;
+        break ;
+      case 0x2e: // del
+        keyCode = 0177 ;
+        break ;
+      default:
+        return ;
+    }
   }
   if( __pdp11 )
     __pdp11.terminal.input( keyCode ) ;
@@ -413,7 +449,7 @@ window.addEventListener( 'dragover', dragOver, false ) ;
 </p>
 
 <p>
-<textarea id="terminalView" cols="80" rows="20" readonly="readonly" onkeypress="inputTerminal( event )"> </textarea>
+<textarea id="terminalView" cols="80" rows="20" readonly="readonly" onkeypress="inputTerminalByKeypress( event )" onkeydown="inputTerminalByKeydown( event )"> </textarea>
 </p>
 
 <p>
